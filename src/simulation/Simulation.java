@@ -13,17 +13,17 @@ public class Simulation implements Serializable {
 
     public static final ScheduledExecutorService exec = new ScheduledThreadPoolExecutor(1);
 
-    final List<SimulatedTransmitter> all = new ArrayList<>();
+    final List<SimulatedLoRaMeshClient> all = new ArrayList<>();
 
-    private transient SimulatedTransmitter selected;
-    private transient List<Consumer<SimulatedTransmitter>> selectionListeners;
+    private transient SimulatedLoRaMeshClient selected;
+    private transient List<Consumer<SimulatedLoRaMeshClient>> selectionListeners;
     boolean pause = true;
     int timeFactor = 100;
     String view = "plain";
 
 
 
-    public SimulatedTransmitter getSelected() {
+    public SimulatedLoRaMeshClient getSelected() {
         return selected;
     }
 
@@ -31,17 +31,17 @@ public class Simulation implements Serializable {
         return selected != null;
     }
 
-    public void select(SimulatedTransmitter simT) {
+    public void select(SimulatedLoRaMeshClient simT) {
         selected = simT;
-        for (Consumer<SimulatedTransmitter> r : selectionListeners) r.accept(selected);
+        for (Consumer<SimulatedLoRaMeshClient> r : selectionListeners) r.accept(selected);
     }
 
     public void unselect() {
         selected = null;
-        for (Consumer<SimulatedTransmitter> r : selectionListeners) r.accept(selected);
+        for (Consumer<SimulatedLoRaMeshClient> r : selectionListeners) r.accept(selected);
     }
 
-    public void addSelectionListener(Consumer<SimulatedTransmitter> r) {
+    public void addSelectionListener(Consumer<SimulatedLoRaMeshClient> r) {
         selectionListeners.add(r);
     }
 
@@ -50,12 +50,12 @@ public class Simulation implements Serializable {
         Simulation simulation = INSTANCE;
         simulation.selectionListeners = new ArrayList<>();
         if (simulation.all.isEmpty()) {
-            SimulatedTransmitter controller = new SimulatedTransmitter("ctl", 0, 0);
-            controller.apiConnected = true;
+            SimulatedLoRaMeshClient controller = new SimulatedLoRaMeshClient("ctl", 0, 0);
+            controller.setController(true);
             simulation.all.add(controller);
         }
-        for (SimulatedTransmitter simT : simulation.all) {
-            if (simT.apiConnected) {
+        for (SimulatedLoRaMeshClient simT : simulation.all) {
+            if (simT.isController()) {
                 simT.init(0);
             }
             else {

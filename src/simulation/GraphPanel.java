@@ -30,7 +30,7 @@ public class GraphPanel extends JPanel {
 
     final Simulation simulation = Simulation.INSTANCE;
 
-    SimulatedTransmitter highlighted;
+    SimulatedLoRaMeshClient highlighted;
 
     int offsetX = Integer.MAX_VALUE, offsetY = Integer.MAX_VALUE;
     double zoom = 100;
@@ -47,7 +47,7 @@ public class GraphPanel extends JPanel {
 
                 if (!SwingUtilities.isLeftMouseButton(e)) return;
 
-                SimulatedTransmitter closest = closest(e);
+                SimulatedLoRaMeshClient closest = closest(e);
                 if (screenDistance(closest, e) <= 10) {
                     if (simulation.hasSelected() && e.isShiftDown()) {
                         String def = String.format("%.2f (default)", simulation.getSelected().naturalReception(closest));
@@ -81,7 +81,7 @@ public class GraphPanel extends JPanel {
                             JOptionPane.PLAIN_MESSAGE);
 
                     if (label != null && !label.isEmpty()) {
-                        simulation.all.add(new SimulatedTransmitter(label, xInv(e.getX()), yInv(e.getY())).init(500));
+                        simulation.all.add(new SimulatedLoRaMeshClient(label, xInv(e.getX()), yInv(e.getY())).init(500));
                     }
                 }
             }
@@ -94,7 +94,7 @@ public class GraphPanel extends JPanel {
                 xLast = e.getX();
                 yLast = e.getY();
                 if (simulation.hasSelected()) return;
-                SimulatedTransmitter closest = closest(e);
+                SimulatedLoRaMeshClient closest = closest(e);
                 if (closest == null) return;
                 highlighted = screenDistance(closest, e) <= 10? closest : null;
             }
@@ -148,15 +148,15 @@ public class GraphPanel extends JPanel {
             g2.drawLine(0, y(i), getWidth(), y(i));
         }
 
-        for (SimulatedTransmitter s : simulation.all) {
+        for (SimulatedLoRaMeshClient s : simulation.all) {
             g2.setColor(new Color(200, 200, 200));
             if (simulation.view.equals("upwards")) {
-                for (SimulatedTransmitter other : simulation.all) if (s.node.getRoutingRegistry().contains(other.node.getId())) {
+                for (SimulatedLoRaMeshClient other : simulation.all) if (s.node.getRoutingRegistry().contains(other.node.getNodeId())) {
                     g2.drawLine(x(s), y(s), x(other), y(other));
                 }
             } else if (simulation.view.equals("downwards")) {
-                for (SimulatedTransmitter other : simulation.all)
-                    if (s.node.getRoutingRegistry().contains((byte) (other.node.getId() ^ (MessageHeader.DOWNWARDS_BIT >>> MessageHeader.ADDRESS_SHIFT)))) {
+                for (SimulatedLoRaMeshClient other : simulation.all)
+                    if (s.node.getRoutingRegistry().contains((byte) (other.node.getNodeId() ^ (MessageHeader.DOWNWARDS_BIT >>> MessageHeader.ADDRESS_SHIFT)))) {
                     g2.drawLine(x(s), y(s), x(other), y(other));
                 }
             }
@@ -180,7 +180,7 @@ public class GraphPanel extends JPanel {
         g2.dispose();
     }
 
-    private Color getColor(SimulatedTransmitter t) {
+    private Color getColor(SimulatedLoRaMeshClient t) {
         return switch (t.node.getStatus()) {
             case Controller -> t == highlighted? CONTROLLER_H : CONTROLLER;
             case Node -> t == highlighted? NODE_H : NODE;
@@ -194,7 +194,7 @@ public class GraphPanel extends JPanel {
     /**
      * model to screen
      */
-    private int x(SimulatedTransmitter simT) {
+    private int x(SimulatedLoRaMeshClient simT) {
         return (int) (simT.x * zoom + offsetX);
     }
 
@@ -205,7 +205,7 @@ public class GraphPanel extends JPanel {
     /**
      * model to screen
      */
-    private int y(SimulatedTransmitter simT) {
+    private int y(SimulatedLoRaMeshClient simT) {
         return (int) (simT.y * zoom + offsetY);
     }
 
@@ -227,13 +227,13 @@ public class GraphPanel extends JPanel {
         return (y - offsetY) / zoom;
     }
 
-    private double screenDistance(SimulatedTransmitter simT, MouseEvent e) {
+    private double screenDistance(SimulatedLoRaMeshClient simT, MouseEvent e) {
         double dx = x(simT) - e.getX();
         double dy = y(simT) - e.getY();
         return Math.sqrt(dx*dx + dy*dy);
     }
 
-    private SimulatedTransmitter closest(MouseEvent e) {
+    private SimulatedLoRaMeshClient closest(MouseEvent e) {
         return simulation.all.stream().min(Comparator.comparingDouble(t -> t.distance(xInv(e.getX()), yInv(e.getY())))).orElse(null);
     }
 }

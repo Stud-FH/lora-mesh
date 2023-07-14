@@ -77,7 +77,7 @@ public class ControlPanel extends JPanel {
         var timeSlider = new JSlider(1, 100, simulation.timeFactor);
         timeSlider.addChangeListener(c -> {
             simulation.timeFactor = timeSlider.getValue();
-            for (SimulatedTransmitter s : simulation.all) s.node.refresh();
+            for (SimulatedLoRaMeshClient s : simulation.all) s.refresh();
         });
         panel.add(timeSlider);
         return panel;
@@ -132,7 +132,7 @@ public class ControlPanel extends JPanel {
 
         JButton logLevel = new JButton("log level");
         logLevel.addActionListener(a -> {
-            SimulatedTransmitter simT = simulation.getSelected();
+            SimulatedLoRaMeshClient simT = simulation.getSelected();
             Logger.Severity[] severities = Logger.Severity.values();
             simT.logLevel = severities[(simT.logLevel.ordinal() + 1) % severities.length];
             logLevel.setText("log: " + simT.logLevel);
@@ -147,8 +147,7 @@ public class ControlPanel extends JPanel {
 
         JButton promote = new JButton("toggle api");
         promote.addActionListener(a -> {
-            simulation.getSelected().apiConnected = !simulation.getSelected().apiConnected;
-            simulation.getSelected().node.statusCheck();
+            simulation.getSelected().setController(!simulation.getSelected().isController());
         });
         grid.add(promote);
 
@@ -180,7 +179,7 @@ public class ControlPanel extends JPanel {
         scroller.setPreferredSize(new Dimension(200, Integer.MAX_VALUE));
         panel.add(scroller);
 
-        Consumer<SimulatedTransmitter> callback = simT -> {
+        Consumer<SimulatedLoRaMeshClient> callback = simT -> {
             header.setText(simT == null? "no node selected" : "modify node: ");
             nameIn.setText(simT == null? "-" : simT.name);
             nameIn.setEnabled(simT != null);
@@ -198,7 +197,7 @@ public class ControlPanel extends JPanel {
         return panel;
     }
 
-    private void openLinkDialog(SimulatedTransmitter source, SimulatedTransmitter target) {
+    private void openLinkDialog(SimulatedLoRaMeshClient source, SimulatedLoRaMeshClient target) {
         if (source == target) return;
         String def = String.format("%.2f (default)", target.naturalReception(source));
         Object[] possibilities = {def, "1.0", "0.9", "0.7", "0.5", "0.3", "0.1", "0.0"};
@@ -217,12 +216,12 @@ public class ControlPanel extends JPanel {
     }
 
     private String[][] calculateTableData() {
-        SimulatedTransmitter simT = simulation.getSelected();
+        SimulatedLoRaMeshClient simT = simulation.getSelected();
         if (simT == null) return new String[0][3];
 
         String[][] data = new String[simulation.all.size()][3];
         int i = 0;
-        for (SimulatedTransmitter other : simulation.all) {
+        for (SimulatedLoRaMeshClient other : simulation.all) {
             String send = other == simT? "-" : String.format("%.2f", other.reception(simT));
             String receive = other == simT? "-" : String.format("%.2f", simT.reception(other));
             data[i++] = new String[] {other.name, send, receive};

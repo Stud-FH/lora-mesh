@@ -1,5 +1,7 @@
 package model.message;
 
+import model.ChannelInfo;
+
 import java.util.Arrays;
 
 public record Message(int header, byte... data) implements MessageHeader {
@@ -14,20 +16,28 @@ public record Message(int header, byte... data) implements MessageHeader {
         return data[idx];
     }
 
-    public String dataString() {
-        return new String(data);
-    }
-
-    public String dataString(int from) {
-        return new String(data).substring(from);
-    }
-
     public boolean hasData() {
         return data.length > 0;
     }
 
     public int dataLength() {
         return data.length;
+    }
+
+    public String dataAsString() {
+        return new String(data);
+    }
+
+    public String dataAsString(int from) {
+        return new String(data).substring(from);
+    }
+
+    public ChannelInfo dataAsChannelInfo() {
+        byte[] d = new byte[6];
+        for (int i = 0; i < data.length && i < 6; i++) {
+            d[i] = data[i];
+        }
+        return new ChannelInfo((short) (d[0]*256+d[1]), (short) (d[2]*256+d[3]), (short) (d[4]*256+d[5]));
     }
 
     public int header() {

@@ -6,9 +6,9 @@ import model.NodeSnapshot;
 
 public class ConsoleLogger implements Logger {
 
-    private final SimulatedTransmitter simT;
+    private final SimulatedLoRaMeshClient simT;
 
-    public ConsoleLogger(SimulatedTransmitter simT) {
+    public ConsoleLogger(SimulatedLoRaMeshClient simT) {
         this.simT = simT;
     }
 

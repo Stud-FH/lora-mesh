@@ -7,41 +7,36 @@ import model.message.MessageType;
 
 import java.util.*;
 
-public class SimulatedApi implements ApiAdapter {
+public class SimulatedPceClient implements PceClient {
 
-    static String meshConfig = "3";
+    static ChannelInfo meshChannel = new ChannelInfo((short) 200, (short) 300, (short) 400);
     static byte nextId = 1;
 
     static Set<String> redeemedJoiningCodes = new HashSet<>();
 
-    static Map<Byte, CorrespondenceManager> correspondences = new HashMap<>();
+    static Map<Byte, CorrespondenceClient> correspondences = new HashMap<>();
 
     static Map<Byte, Set<Byte>> calculatedRouting = new HashMap<>();
     static Map<Byte, Set<Byte>> routing = new HashMap<>();
     static Map<Byte, Map<Byte, Byte>> reception = new HashMap<>();
     static Map<Byte, Long> lastControllerPing = new HashMap<>();
 
-    SimulatedTransmitter simT;
+    boolean connected;
 
-    public SimulatedApi(SimulatedTransmitter simT) {
-        this.simT = simT;
+    SimulatedLoRaMeshClient sim;
+
+    public SimulatedPceClient(SimulatedLoRaMeshClient sim) {
+        this.sim = sim;
     }
 
     @Override
-    public boolean testConnection() {
-        if (!simT.apiConnected) return false;
-        lastControllerPing.put(simT.node.getId(), System.currentTimeMillis());
-        return true;
-    }
-
-    @Override
-    public CorrespondenceManager correspondence(byte nodeId) {
+    public CorrespondenceClient correspondence(byte nodeId) {
         return correspondences.get(nodeId);
     }
 
     @Override
     public List<String> receive(byte controllerId, Message message) {
-        if (!testConnection()) throw new IllegalStateException();
+        if (!connected) throw new IllegalStateException();
 
         synchronized(Simulation.INSTANCE) {
 
@@ -61,7 +56,7 @@ public class SimulatedApi implements ApiAdapter {
             if (message.getNodeId() == 0 || MessageType.Join.matches(message)) {
                 var code = new String(message.data()).substring(1);
                 if (tryRedeemJoiningCode(code)) {
-                    byte assignedId = nextId();
+                    byte assignedId = allocateNodeId();
                     jobs.add(String.format("%d invite %d %s", message.getNodeId(), assignedId, code));
                 }
             } else if (MessageType.Routing.matches(message)) {
@@ -69,18 +64,16 @@ public class SimulatedApi implements ApiAdapter {
                 StringBuilder job = new StringBuilder(String.format("%d update ", message.getNodeId()));
                 for (byte b : updates) job.append(";").append(b);
                 jobs.add(job.toString());
-            } else if (MessageType.Data.matches(message)) {
-                feedData(message.data());
             }
             return jobs;
         }
     }
 
     @Override
-    public byte nextId() {
-        if (!testConnection()) throw new IllegalStateException();
+    public byte allocateNodeId() {
+        if (!connected) throw new IllegalStateException();
         synchronized (Simulation.INSTANCE) {
-            correspondences.put(nextId, LocalCorrespondenceManager.to(nextId));
+            correspondences.put(nextId, LocalCorrespondenceClient.to(nextId));
             return nextId++;
         }
     }
@@ -99,17 +92,14 @@ public class SimulatedApi implements ApiAdapter {
     }
 
     @Override
-    public String getTuning() {
-        if (!testConnection()) throw new IllegalStateException();
-        return meshConfig;
-    }
-
-    void feedData(byte[] data) {
-        System.out.println("data received: "+ new String(data));
+    public ChannelInfo heartbeat() {
+        if (!connected) return null;
+        lastControllerPing.put(sim.node.getNodeId(), System.currentTimeMillis());
+        return meshChannel;
     }
 
     boolean tryRedeemJoiningCode(String code) {
-        if (!testConnection()) throw new IllegalStateException();
+        if (!connected) throw new IllegalStateException();
         synchronized (Simulation.INSTANCE) {
             return redeemedJoiningCodes.add(code);
         }

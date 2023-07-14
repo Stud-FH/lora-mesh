@@ -10,32 +10,32 @@ public class NodeSnapshot {
 
     public static NodeSnapshot complete(Node node) {
         return new NodeSnapshot(
-                node.getId(),
+                node.getNodeId(),
                 node.getStatus(),
-                node.getTuning(),
+                node.getMeshChannel(),
                 node.getRoutingRegistry(),
                 node.calculateReception());
     }
 
-    public static NodeSnapshot fromUpwardsRoutingUpdate(byte nodeId, String tuning, byte[] receptionData) {
-        Map<Byte, Byte> reception = new HashMap<>();
-        for (int i = 0; i + 1 < receptionData.length; i += 2) reception.put(receptionData[i], receptionData[i + 1]);
+    public static NodeSnapshot fromUpwardsRoutingUpdate(byte nodeId, ChannelInfo meshChannel, byte[] receptionData) {
+        Map<Byte, Double> reception = new HashMap<>();
+        for (int i = 0; i + 1 < receptionData.length; i += 2) reception.put(receptionData[i], receptionData[i + 1] / 256.0);
 
         return new NodeSnapshot(
                 nodeId,
                 NodeStatus.Node,
-                tuning,
+                meshChannel,
                 null,
                 reception);
     }
 
     public static byte[] receptionData(Node node) {
-        Collection<Map.Entry<Byte, Byte>> entries = node.calculateReception().entrySet();
+        Collection<Map.Entry<Byte, Double>> entries = node.calculateReception().entrySet();
         byte[] data = new byte[entries.size() * 2];
         int i = 0;
-        for (Map.Entry<Byte, Byte> entry : entries) {
+        for (var entry : entries) {
             data[i++] = entry.getKey();
-            data[i++] = entry.getValue();
+            data[i++] = (byte) (entry.getValue() * 256);
         }
         return data;
     }
@@ -59,16 +59,16 @@ public class NodeSnapshot {
     public final LocalDateTime timestamp;
     public final byte id;
     public final NodeStatus status;
-    public final String tuning;
+    public final ChannelInfo meshChannel;
     public final Set<Byte> routingRegistry;
-    public final Map<Byte, Byte> reception;
+    public final Map<Byte, Double> reception;
 
-    private NodeSnapshot(byte id, NodeStatus status, String tuning, Set<Byte> routingRegistry, Map<Byte, Byte> reception) {
+    private NodeSnapshot(byte id, NodeStatus status, ChannelInfo meshChannel, Set<Byte> routingRegistry, Map<Byte, Double> reception) {
         this.threadId = Thread.currentThread().threadId();
         this.timestamp = LocalDateTime.now();
         this.id = id;
         this.status = status;
-        this.tuning = tuning;
+        this.meshChannel = meshChannel;
         this.routingRegistry = routingRegistry == null? null : Collections.unmodifiableSet(routingRegistry);
         this.reception = reception == null? null : Collections.unmodifiableMap(reception);
     }
@@ -76,6 +76,6 @@ public class NodeSnapshot {
     @Override
     public String toString() {
         return String.format("[ %s | pid=%d\t| node~%d(%s) @%s ]",
-                timestamp.format(format), threadId, id, status, tuning);
+                timestamp.format(format), threadId, id, status, meshChannel);
     }
 }

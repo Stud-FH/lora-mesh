@@ -7,14 +7,14 @@ import model.message.MessageType;
 import java.util.HashSet;
 import java.util.Set;
 
-public class LocalCorrespondenceManager implements CorrespondenceManager {
+public class LocalCorrespondenceClient implements CorrespondenceClient {
 
-    public static LocalCorrespondenceManager to(int nodeId) {
-        return new LocalCorrespondenceManager(nodeId | MessageHeader.DOWNWARDS_BIT, 1 << MessageHeader.COUNTER_BITS);
+    public static LocalCorrespondenceClient to(int nodeId) {
+        return new LocalCorrespondenceClient(nodeId | MessageHeader.DOWNWARDS_BIT, 1 << MessageHeader.COUNTER_BITS);
     }
 
-    public static LocalCorrespondenceManager from(int nodeId) {
-        return new LocalCorrespondenceManager(nodeId, 1 << MessageHeader.COUNTER_BITS);
+    public static LocalCorrespondenceClient from(int nodeId) {
+        return new LocalCorrespondenceClient(nodeId, 1 << MessageHeader.COUNTER_BITS);
     }
 
     private int sendingCounter = 0;
@@ -24,7 +24,7 @@ public class LocalCorrespondenceManager implements CorrespondenceManager {
     private final int address;
     private final int counterLimit;
 
-    private LocalCorrespondenceManager(int address, int counterLimit) {
+    private LocalCorrespondenceClient(int address, int counterLimit) {
         this.address = address;
         this.counterLimit = counterLimit;
     }
