@@ -1,5 +1,7 @@
 package model;
 
+import model.message.NodeInfo;
+
 public interface Logger {
 
     enum Severity {
@@ -9,22 +11,22 @@ public interface Logger {
         Error
     }
 
-    void log(Severity severity, String text, Node node);
+    void log(Severity severity, String text, NodeInfo nodeInfo);
 
-    default void debug(String text, Node node) {
-        log(Severity.Debug, text, node);
+    default void debug(String text, NodeInfo nodeInfo) {
+        log(Severity.Debug, text, nodeInfo);
     }
 
-    default void info(String text, Node node) {
-        log(Severity.Info, text, node);
+    default void info(String text, NodeInfo nodeInfo) {
+        log(Severity.Info, text, nodeInfo);
     }
 
-    default void warn(String text, Node node) {
-        log(Severity.Warn, text, node);
+    default void warn(String text, NodeInfo nodeInfo) {
+        log(Severity.Warn, text, nodeInfo);
     }
 
-    default void error(String text, Node node) {
-        log(Severity.Error, text, node);
+    default void error(String text, NodeInfo nodeInfo) {
+        log(Severity.Error, text, nodeInfo);
     }
 
 }

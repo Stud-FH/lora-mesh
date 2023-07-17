@@ -4,11 +4,12 @@ import model.execution.*;
 import model.message.Message;
 import model.message.MessageHeader;
 import model.message.MessageType;
+import model.message.NodeInfo;
 
 import java.nio.ByteBuffer;
 import java.util.*;
 
-public class Node {
+public class Node implements Runnable {
 
     public static final int HELLO_INTERVAL = 20;
     public static final int ROUTING_INTERVAL = 200;
@@ -26,6 +27,7 @@ public class Node {
     private final Set<Byte> routingRegistry = new HashSet<>();
 
     private RetxRegister retxRegister;
+    private Map<Integer, Double> retxMap = new HashMap<>();
     private final Map<String, Integer> joinCounter = new HashMap<>();
     private final Map<Integer, Integer> traceCounter = new HashMap<>();
 
@@ -53,43 +55,43 @@ public class Node {
 
     public void statusCheck() {
         // todo is rebooting necessary?
-        switch (status) {
-            case Controller -> {
-                meshChannel = pceClient.heartbeat();
-                if (meshChannel == null) error("disconnected");
-            }
-            case Node -> {
-                var result = pceClient.heartbeat();
-                if (result != null) error("connected");
-            }
-        }
+//        switch (status) {
+//            case Controller -> {
+//                meshChannel = pceClient.heartbeat();
+//                if (meshChannel == null) error("disconnected");
+//            }
+//            case Node -> {
+//                var result = pceClient.heartbeat();
+//                if (result != null) error("connected");
+//            }
+//        }
     }
 
     public void debug(String format, Object... args) {
         if (logger == null) return;
-        logger.debug(String.format(format, args), this);
+        logger.debug(String.format(format, args), info());
     }
 
     public void info(String format, Object... args) {
         if (logger == null) return;
-        logger.info(String.format(format, args), this);
+        logger.info(String.format(format, args), info());
     }
 
     public void warn(String format, Object... args) {
         if (logger == null) return;
-        logger.warn(String.format(format, args), this);
+        logger.warn(String.format(format, args), info());
     }
 
     public void error(String format, Object... args) {
         handler.abortAndReset();
         status = NodeStatus.Error;
         if (logger == null) return;
-        logger.error(String.format(format, args), this);
+        logger.error(String.format(format, args), info());
         handler.scheduled("recover", System.currentTimeMillis() + 1000)
-                .then(this::wake);
+                .then(this);
     }
 
-    public void wake() {
+    public void run() {
         if (isAlive()) {
             warn("wake up called on live node");
             return;
@@ -97,10 +99,10 @@ public class Node {
             debug("wake up");
         }
 
-        meshChannel = pceClient.heartbeat();
+        meshChannel = pceClient.heartbeat(info());
         if (meshChannel != null) {
             isController = true;
-            initController(pceClient.allocateNodeId());
+            initController(pceClient.allocateNodeId(serialId, (byte) -1, 0.0));
         } else {
             seek();
         }
@@ -125,7 +127,7 @@ public class Node {
             meshClient.enqueue(meshChannel, message);
         } else if (MessageType.Upwards.matches(message) && status == NodeStatus.Controller) {
             debug("to api: %s", message);
-            var commands = pceClient.receive(this.nodeId, message);
+            var commands = pceClient.feed(this.serialId, message);
             debug("api answered: %s", commands);
             for (var command : commands) interpretCommand(command);
         } else {
@@ -287,7 +289,7 @@ public class Node {
             handleTrace(message);
         } else {
             debug("to api: %s", message);
-            var commands = pceClient.receive(this.nodeId, message);
+            var commands = pceClient.feed(this.serialId, message);
             debug("api answered: %s", commands);
             for (var command : commands) interpretCommand(command);
         }
@@ -470,6 +472,10 @@ public class Node {
 
     public Map<Byte, Double> calculateReception() {
         return retxRegister.calculateRetxMap(0.5);
+    }
+
+    public NodeInfo info() {
+        return new NodeInfo(serialId, status, nodeId, retxMap);
     }
 
     private void updateRouting(byte[] data) {

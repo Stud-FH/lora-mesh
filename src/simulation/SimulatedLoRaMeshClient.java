@@ -43,7 +43,7 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
                 data,
                 pce,
                 new ConsoleLogger(this));
-        Simulation.exec.schedule(node::wake, delay, TimeUnit.MILLISECONDS);
+        Simulation.exec.schedule(node::run, delay, TimeUnit.MILLISECONDS);
         return this;
     }
 

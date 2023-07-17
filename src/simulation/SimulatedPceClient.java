@@ -4,6 +4,7 @@ import model.*;
 import model.message.Message;
 import model.message.MessageHeader;
 import model.message.MessageType;
+import model.message.NodeInfo;
 
 import java.util.*;
 
@@ -35,7 +36,7 @@ public class SimulatedPceClient implements PceClient {
     }
 
     @Override
-    public List<String> receive(byte controllerId, Message message) {
+    public List<String> feed(long controllerId, Message message) {
         if (!connected) throw new IllegalStateException();
 
         synchronized(Simulation.INSTANCE) {
@@ -56,7 +57,7 @@ public class SimulatedPceClient implements PceClient {
             if (message.getNodeId() == 0 || MessageType.Join.matches(message)) {
                 var code = new String(message.data()).substring(1);
                 if (tryRedeemJoiningCode(code)) {
-                    byte assignedId = allocateNodeId();
+                    byte assignedId = allocateNodeId(0L, (byte) -1, 0.0); // todo
                     jobs.add(String.format("%d invite %d %s", message.getNodeId(), assignedId, code));
                 }
             } else if (MessageType.Routing.matches(message)) {
@@ -70,7 +71,8 @@ public class SimulatedPceClient implements PceClient {
     }
 
     @Override
-    public byte allocateNodeId() {
+    public byte allocateNodeId(long serialId, byte mediatorId, double mediatorRetx) {
+        // todo
         if (!connected) throw new IllegalStateException();
         synchronized (Simulation.INSTANCE) {
             correspondences.put(nextId, LocalCorrespondenceClient.to(nextId));
@@ -92,9 +94,10 @@ public class SimulatedPceClient implements PceClient {
     }
 
     @Override
-    public ChannelInfo heartbeat() {
+    public ChannelInfo heartbeat(NodeInfo nodeInfo) {
         if (!connected) return null;
         lastControllerPing.put(sim.node.getNodeId(), System.currentTimeMillis());
+        // todo use node info for calculation
         return meshChannel;
     }
 

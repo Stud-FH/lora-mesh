@@ -10,23 +10,23 @@ import java.util.Set;
 public class LocalCorrespondenceClient implements CorrespondenceClient {
 
     public static LocalCorrespondenceClient to(int nodeId) {
-        return new LocalCorrespondenceClient(nodeId | MessageHeader.DOWNWARDS_BIT, 1 << MessageHeader.COUNTER_BITS);
+        return new LocalCorrespondenceClient(nodeId | MessageHeader.DOWNWARDS_BIT);
     }
 
     public static LocalCorrespondenceClient from(int nodeId) {
-        return new LocalCorrespondenceClient(nodeId, 1 << MessageHeader.COUNTER_BITS);
+        return new LocalCorrespondenceClient(nodeId);
     }
+
+    private static final int counterLimit = 1 << MessageHeader.COUNTER_BITS;
 
     private int sendingCounter = 0;
     private int nextReceivingCounter = 0;
     private final Set<Integer> missing = new HashSet<>();
 
     private final int address;
-    private final int counterLimit;
 
-    private LocalCorrespondenceClient(int address, int counterLimit) {
+    private LocalCorrespondenceClient(int address) {
         this.address = address;
-        this.counterLimit = counterLimit;
     }
 
     @Override
