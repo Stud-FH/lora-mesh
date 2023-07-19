@@ -1,14 +1,11 @@
 package production;
 
 import model.Node;
+import model.execution.Exec;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.net.http.HttpClient;
 import java.util.Scanner;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 public class Production {
 
@@ -26,16 +23,16 @@ public class Production {
         String apiUrl = s2.nextLine();
         s2.close();
 
-        var meshClient = new E32LoRaMeshClient();
         var dataClient = new HttpDataClient(apiUrl);
         var pceClient = new HttpPceClient(apiUrl);
         var logger = new HttpLogger(apiUrl);
+        var meshClient = new E32LoRaMeshClient(logger);
 
         var node = new Node(serialId, meshClient, dataClient, pceClient, logger);
 
-        ScheduledExecutorService exec = new ScheduledThreadPoolExecutor(2);
-        exec.schedule(node, 10, TimeUnit.MILLISECONDS);
+        Exec.run(node, 50);
+
         var statusClient = new HttpStatusClient(apiUrl, serialId);
-        exec.scheduleAtFixedRate(statusClient::status, 0, 1, TimeUnit.HOURS);
+        Exec.repeat(statusClient::status, 3600000);
     }
 }

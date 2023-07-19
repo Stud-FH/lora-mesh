@@ -2,13 +2,8 @@ package simulation;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class GUI extends JFrame {
-
-    final ScheduledExecutorService exec = new ScheduledThreadPoolExecutor(1);
-
 
     public GUI() {
         super("Lora Mesh OpenFlow Simulator");

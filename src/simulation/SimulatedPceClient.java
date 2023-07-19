@@ -1,16 +1,13 @@
 package simulation;
 
 import model.*;
-import model.message.Message;
-import model.message.MessageHeader;
-import model.message.MessageType;
-import model.message.NodeInfo;
+import model.message.*;
 
 import java.util.*;
 
 public class SimulatedPceClient implements PceClient {
 
-    static ChannelInfo meshChannel = new ChannelInfo((short) 200, (short) 300, (short) 400);
+    static ChannelInfo meshChannel = new ChannelInfo("sim channel 1");
     static byte nextId = 1;
 
     static Set<String> redeemedJoiningCodes = new HashSet<>();
@@ -83,7 +80,7 @@ public class SimulatedPceClient implements PceClient {
     Set<Byte> updateRouting(Message message) {
         synchronized (Simulation.INSTANCE) {
             reception.computeIfAbsent(message.getNodeId(), HashMap::new)
-                    .putAll(NodeSnapshot.receptionMap(message.data()));
+                    .putAll(MessageUtil.retxDataToRetxMap(message.data()));
 //            runFloydWarshall(); TODO
             Set<Byte> current = routing.getOrDefault(message.getNodeId(), Set.of());
             Set<Byte> calculated = calculatedRouting.getOrDefault(message.getNodeId(), Set.of());

@@ -7,6 +7,10 @@ import java.net.http.HttpResponse;
 
 public class HttpStatusClient {
 
+    private enum ActionCommand {
+        GitPull
+    }
+
     private final String baseUrl;
     private final long serialId;
     HttpClient http = Production.http;

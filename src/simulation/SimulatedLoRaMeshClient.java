@@ -2,13 +2,15 @@ package simulation;
 
 import model.*;
 import model.Observer;
+import model.execution.Exec;
 import model.message.Message;
 import model.message.MessageType;
+import model.message.NodeInfo;
 
 import java.io.Serializable;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
 
@@ -43,7 +45,7 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
                 data,
                 pce,
                 new ConsoleLogger(this));
-        Simulation.exec.schedule(node::run, delay, TimeUnit.MILLISECONDS);
+        Exec.run(node, delay);
         return this;
     }
 
@@ -65,7 +67,7 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
     }
 
     @Override
-    public void enqueue(ChannelInfo channel, Message message) {
+    public void enqueue(ChannelInfo channel, Message message, NodeInfo nodeInfo) {
         if (message.dataLength() > 12) node.warn("sending long message: %s", message);
         if (MessageType.Hello.matches(message)) {
             lastHello = System.currentTimeMillis();
@@ -91,7 +93,7 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
     }
 
     @Override
-    public void listen(ChannelInfo channelInfo, Observer<Message> observer) {
+    public void listen(ChannelInfo channelInfo, Observer<Message> observer, Supplier<NodeInfo> nodeInfoSupplier) {
         this.listeningChannel = channelInfo;
         this.receiveCallback = observer::next;
     }
@@ -118,6 +120,6 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
 
     @Override
     public String toString() {
-        return name + ":  \t" + NodeSnapshot.complete(node);
+        return name + ":  \t" + node.info();
     }
 }

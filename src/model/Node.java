@@ -1,17 +1,17 @@
 package model;
 
 import model.execution.*;
-import model.message.Message;
-import model.message.MessageHeader;
-import model.message.MessageType;
-import model.message.NodeInfo;
+import model.message.*;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.function.Consumer;
 
 public class Node implements Runnable {
 
+    public static final int STATUS_CHECK_INTERVAL = 100;
     public static final int HELLO_INTERVAL = 20;
+    public static final int RENDEZVOUS_INTERVAL = 50;
     public static final int ROUTING_INTERVAL = 200;
     public static final int TRACING_PERIOD = 10;
     public static final int JOIN_VOLLEY_AMOUNT = 10;
@@ -27,7 +27,7 @@ public class Node implements Runnable {
     private final Set<Byte> routingRegistry = new HashSet<>();
 
     private RetxRegister retxRegister;
-    private Map<Integer, Double> retxMap = new HashMap<>();
+    private final Map<Integer, Double> retxMap = new HashMap<>();
     private final Map<String, Integer> joinCounter = new HashMap<>();
     private final Map<Integer, Integer> traceCounter = new HashMap<>();
 
@@ -39,7 +39,10 @@ public class Node implements Runnable {
     private final LoRaMeshClient meshClient;
     private final PceClient pceClient;
     private final DataSinkClient dataSinkClient;
+    private boolean dataSinkConnected = false;
     private final Logger logger;
+
+    private Consumer<Message> messageHandler;
 
     public Node(long serialId, LoRaMeshClient meshClient, DataSinkClient dataSinkClient, PceClient pceClient, Logger logger) {
         this.serialId = serialId;
@@ -54,17 +57,18 @@ public class Node implements Runnable {
     }
 
     public void statusCheck() {
-        // todo is rebooting necessary?
-//        switch (status) {
-//            case Controller -> {
-//                meshChannel = pceClient.heartbeat();
-//                if (meshChannel == null) error("disconnected");
-//            }
-//            case Node -> {
-//                var result = pceClient.heartbeat();
-//                if (result != null) error("connected");
-//            }
-//        }
+        switch (status) {
+            case Controller -> {
+                meshChannel = pceClient.heartbeat(info());
+                if (meshChannel == null) error("disconnected");
+                dataSinkConnected = dataSinkClient.heartbeat();
+            }
+            case Node -> {
+                var result = pceClient.heartbeat(info());
+                if (result != null) error("connected");
+                dataSinkConnected = dataSinkClient.heartbeat();
+            }
+        }
     }
 
     public void debug(String format, Object... args) {
@@ -99,10 +103,11 @@ public class Node implements Runnable {
             debug("wake up");
         }
 
+        dataSinkConnected = dataSinkClient.heartbeat();
         meshChannel = pceClient.heartbeat(info());
         if (meshChannel != null) {
             isController = true;
-            initController(pceClient.allocateNodeId(serialId, (byte) -1, 0.0));
+            initNode(pceClient.allocateNodeId(serialId, (byte) -1, 0.0), true);
         } else {
             seek();
         }
@@ -124,16 +129,19 @@ public class Node implements Runnable {
                 || MessageType.Trace.matches(message)
                 || MessageType.Resend.matches(message)) {
             debug("sending uncached %s", message);
-            meshClient.enqueue(meshChannel, message);
+            meshClient.enqueue(meshChannel, message, info());
+        } else if (MessageType.Data.matches(message) && dataSinkConnected) {
+            info("feeding data sink: %s", message);
+            dataSinkClient.feed(message);
         } else if (MessageType.Upwards.matches(message) && status == NodeStatus.Controller) {
-            debug("to api: %s", message);
+            debug("feeding pce: %s", message);
             var commands = pceClient.feed(this.serialId, message);
-            debug("api answered: %s", commands);
+            debug("pce answered: %s", commands);
             for (var command : commands) interpretCommand(command);
         } else {
             info("sending %s", message);
             cache.store(message);
-            meshClient.enqueue(meshChannel, message);
+            meshClient.enqueue(meshChannel, message, info());
         }
     }
 
@@ -147,7 +155,7 @@ public class Node implements Runnable {
 
             @Override
             public void next(Message message) {
-                meshChannel = message.dataAsChannelInfo();
+                meshChannel = MessageUtil.rendezvousDataToChannelInfo(message.data());
                 join();
             }
 
@@ -160,7 +168,7 @@ public class Node implements Runnable {
             public void dispose() {
                 disposed = true;
             }
-        });
+        }, this::info);
     }
 
     private void join() {
@@ -168,53 +176,53 @@ public class Node implements Runnable {
         nodeId = 0;
         status = NodeStatus.Joining;
 
-        // construct join message
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + 1);
-        buffer.put((byte) 0);
-        buffer.putLong(serialId);
-        byte[] data =  buffer.array();
-
         hello = LocalCorrespondenceClient.from(nodeId);
+        var data = MessageUtil.serialIdToJoinData(serialId);
 
-        var that = this;
+        messageHandler = message -> {
+            if (MessageType.DownwardsJoin.matches(message) && message.hasData()) {
+                var result = MessageUtil.inviteDataToInviteResult(message.data());
+                if (result.serialId() == this.serialId) {
+                    initNode(result.assignedId(), false);
+                }
+            }
+        };
+
         meshClient.listen(meshChannel, new Observer<>() {
             boolean disposed = false;
             @Override
             public void next(Message message) {
-                if (MessageType.DownwardsJoin.matches(message) && message.hasData()) {
-                    ByteBuffer buffer = ByteBuffer.wrap(message.data());
-                    byte assignedId = buffer.get();
-                    long serialId = buffer.getLong();
-                    if (serialId == that.serialId) {
-                        dispose();
-                        initNode(assignedId);
-                    }
-                }
+                messageHandler.accept(message);
             }
 
             @Override
             public boolean isExpired() {
-                return disposed;
+                return disposed || !isAlive();
             }
 
             @Override
             public void dispose() {
                 disposed = true;
             }
-        });
+        }, this::info);
 
         for (int i = 0; i < JOIN_VOLLEY_AMOUNT; i++) {
             send(hello.packAndIncrement(MessageType.Hello, data));
         }
     }
 
-    private void initNode(byte assignedId) {
-        info("init as node %d", assignedId);
+    private void initNode(byte assignedId, boolean controller) {
+        info("init as %s %d", controller? "controller" : "node", assignedId);
         this.nodeId = assignedId;
         hello = LocalCorrespondenceClient.from(this.nodeId);
         uplink = LocalCorrespondenceClient.from(this.nodeId);
         retxRegister = new RetxRegisterImpl();
-        status = NodeStatus.Node;
+        status = controller? NodeStatus.Controller : NodeStatus.Node;
+
+        handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
+                .then(this::statusCheck)
+                .labelled("status check")
+                .reactEvery(STATUS_CHECK_INTERVAL);
 
         handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
                 .then(() -> send(generateHello()))
@@ -222,64 +230,17 @@ public class Node implements Runnable {
                 .reactEvery(HELLO_INTERVAL);
 
         handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
-                .then(() -> send(generateNetworkData()))
-                .labelled("routing")
-                .reactEvery(ROUTING_INTERVAL);
-
-        meshClient.listen(meshChannel, new Observer<>() {
-            boolean disposed = false;
-            @Override
-            public void next(Message message) {
-                handleMessageAsNode(message);
-            }
-
-            @Override
-            public boolean isExpired() {
-                return disposed || status != NodeStatus.Node || nodeId != assignedId;
-            }
-
-            @Override
-            public void dispose() {
-                disposed = true;
-            }
-        });
-    }
-
-    private void initController(byte assignedId) {
-        info("init as controller %d", assignedId);
-        this.nodeId = assignedId;
-        hello = LocalCorrespondenceClient.from(this.nodeId);
-        uplink = LocalCorrespondenceClient.from(this.nodeId);
-        retxRegister = new RetxRegisterImpl();
-        status = NodeStatus.Controller;
-
-        handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
-                .then(() -> send(generateHello()))
-                .labelled("hello")
-                .reactEvery(HELLO_INTERVAL);
+                .then(() -> meshClient.enqueue(ChannelInfo.rendezvous,
+                        new Message(0, MessageUtil.channelInfoToRendezvousData(meshChannel)), info()))
+                .labelled("rendezvous")
+                .reactEvery(RENDEZVOUS_INTERVAL);
 
         handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
                 .then(() -> send(generateNetworkData()))
                 .labelled("routing")
                 .reactEvery(ROUTING_INTERVAL);
 
-        meshClient.listen(meshChannel, new Observer<>() {
-            boolean disposed = false;
-            @Override
-            public void next(Message message) {
-                handleMessageAsController(message);
-            }
-
-            @Override
-            public boolean isExpired() {
-                return disposed || status != NodeStatus.Controller || nodeId != assignedId;
-            }
-
-            @Override
-            public void dispose() {
-                disposed = true;
-            }
-        });
+        messageHandler = controller? this::handleMessageAsController : this::handleMessageAsNode;
     }
 
     private void  handleMessageAsController(Message message) {
@@ -462,16 +423,8 @@ public class Node implements Runnable {
         return status;
     }
 
-    public ChannelInfo getMeshChannel() {
-        return meshChannel;
-    }
-
     public Set<Byte> getRoutingRegistry() {
         return routingRegistry;
-    }
-
-    public Map<Byte, Double> calculateReception() {
-        return retxRegister.calculateRetxMap(0.5);
     }
 
     public NodeInfo info() {

@@ -1,5 +1,6 @@
 package simulation;
 
+import model.execution.Exec;
 import model.message.MessageHeader;
 
 import javax.swing.*;
@@ -122,7 +123,7 @@ public class GraphPanel extends JPanel {
             }
         });
 
-        parent.exec.scheduleAtFixedRate(this::repaint, 200, 15, TimeUnit.MILLISECONDS);
+        Exec.repeat(this::repaint, 15, 200);
     }
 
     @Override

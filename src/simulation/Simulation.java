@@ -2,16 +2,12 @@ package simulation;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.function.Consumer;
 
 public class Simulation implements Serializable {
 
     public static final String SAVE_PATH = String.format("%s/LoraMesh/simulations/latest.ser", System.getenv("LOCALAPPDATA"));
     public static final Simulation INSTANCE;
-
-    public static final ScheduledExecutorService exec = new ScheduledThreadPoolExecutor(1);
 
     final List<SimulatedLoRaMeshClient> all = new ArrayList<>();
 
