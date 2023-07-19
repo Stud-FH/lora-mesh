@@ -4,6 +4,7 @@ import model.*;
 import model.message.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class SimulatedPceClient implements PceClient {
 
@@ -84,7 +85,7 @@ public class SimulatedPceClient implements PceClient {
 //            runFloydWarshall(); TODO
             Set<Byte> current = routing.getOrDefault(message.getNodeId(), Set.of());
             Set<Byte> calculated = calculatedRouting.getOrDefault(message.getNodeId(), Set.of());
-            Set<Byte> updates = new HashSet<>(calculated.stream().filter(b -> !current.contains(b)).toList());
+            Set<Byte> updates = new HashSet<>(calculated.stream().filter(b -> !current.contains(b)).collect(Collectors.toList()));
             current.stream().filter(b -> !calculated.contains(b)).map(b -> (byte) (b | (MessageHeader.DELETE_BIT))).forEach(updates::add);
             return updates;
         }

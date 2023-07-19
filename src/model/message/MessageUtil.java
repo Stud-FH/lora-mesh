@@ -34,12 +34,12 @@ public class MessageUtil {
 
     public static byte[] channelInfoToRendezvousData(ChannelInfo info) {
         ByteBuffer buffer = ByteBuffer.allocate(6);
-        buffer.putChar(info.code().charAt(0));
-        buffer.putChar(info.code().charAt(1));
-        buffer.putChar(info.code().charAt(2));
-        buffer.putChar(info.code().charAt(3));
-        buffer.putChar(info.code().charAt(4));
-        buffer.putChar(info.code().charAt(5));
+        buffer.putChar(info.code.charAt(0));
+        buffer.putChar(info.code.charAt(1));
+        buffer.putChar(info.code.charAt(2));
+        buffer.putChar(info.code.charAt(3));
+        buffer.putChar(info.code.charAt(4));
+        buffer.putChar(info.code.charAt(5));
         return buffer.array();
     }
 
@@ -48,5 +48,13 @@ public class MessageUtil {
         return new ChannelInfo(buffer.toString());
     }
 
-    public record InviteResult(byte assignedId, long serialId) {}
+    public static class InviteResult {
+        public final byte assignedId;
+        public final long serialId;
+
+        public InviteResult(byte assignedId, long serialId) {
+            this.assignedId = assignedId;
+            this.serialId = serialId;
+        }
+    }
 }

@@ -169,9 +169,12 @@ public class ControlPanel extends JPanel {
         select.addListSelectionListener(e -> {
             if (!simulation.hasSelected()) return;
             switch (table.getSelectedColumn()) {
-                case 0 -> {}
-                case 1 -> openLinkDialog(simulation.getSelected(), simulation.all.get(table.getSelectedRow()));
-                case 2 -> openLinkDialog(simulation.all.get(table.getSelectedRow()), simulation.getSelected());
+                case 0: {}
+                    break;
+                case 1: openLinkDialog(simulation.getSelected(), simulation.all.get(table.getSelectedRow()));
+                break;
+                case 2: openLinkDialog(simulation.all.get(table.getSelectedRow()), simulation.getSelected());
+                break;
             }
         });
 

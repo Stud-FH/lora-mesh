@@ -55,7 +55,7 @@ public class Simulation implements Serializable {
                 simT.init(0);
             }
             else {
-                simT.init(r.nextLong(10000));
+                simT.init(r.nextLong() % 10000);
             }
         }
         new GUI();

@@ -58,16 +58,17 @@ public class Node implements Runnable {
 
     public void statusCheck() {
         switch (status) {
-            case Controller -> {
+            case Controller:
                 meshChannel = pceClient.heartbeat(info());
                 if (meshChannel == null) error("disconnected");
                 dataSinkConnected = dataSinkClient.heartbeat();
-            }
-            case Node -> {
+                break;
+
+            case Node:
                 var result = pceClient.heartbeat(info());
                 if (result != null) error("connected");
                 dataSinkConnected = dataSinkClient.heartbeat();
-            }
+                break;
         }
     }
 
@@ -181,9 +182,9 @@ public class Node implements Runnable {
 
         messageHandler = message -> {
             if (MessageType.DownwardsJoin.matches(message) && message.hasData()) {
-                var result = MessageUtil.inviteDataToInviteResult(message.data());
-                if (result.serialId() == this.serialId) {
-                    initNode(result.assignedId(), false);
+                var result = MessageUtil.inviteDataToInviteResult(message.data);
+                if (result.serialId == this.serialId) {
+                    initNode(result.assignedId, false);
                 }
             }
         };
@@ -258,11 +259,11 @@ public class Node implements Runnable {
 
     private void handleMessageAsNode(Message message) {
         switch (MessageType.pure(message)) {
-            case Hello -> handleHello(message);
-            case Join -> handleJoin(message);
-            case Routing -> handleRouting(message);
-            case Trace -> handleTrace(message);
-            default -> handleDefaultAsNode(message);
+            case Hello: handleHello(message); break;
+            case Join: handleJoin(message); break;
+            case Routing: handleRouting(message); break;
+            case Trace: handleTrace(message); break;
+            default: handleDefaultAsNode(message); break;
         }
     }
 
@@ -445,7 +446,7 @@ public class Node implements Runnable {
         String[] parts = command.split(" ");
         byte targetId = Byte.parseByte(parts[0]);
         switch (parts[1]) {
-            case "invite" -> {
+            case "invite": {
                 byte assignedId = Byte.parseByte(parts[2]);
                 byte[] data = new byte[parts[3].length() + 1];
                 int i = 0;
@@ -466,16 +467,18 @@ public class Node implements Runnable {
                             .then(() -> send(message));
                 }
             }
-            case "trace" -> {
+                break;
+            case "trace": {
                 byte[] data = new byte[parts.length - 2];
-                for (int i = 1; i < data.length; i++) data[i] = Byte.parseByte(parts[i+2]);
+                for (int i = 1; i < data.length; i++) data[i] = Byte.parseByte(parts[i + 2]);
                 handler.immediate(command)
                         .then(() -> send(pceClient.correspondence(targetId).pack(MessageType.Trace, data)))
                         .labelled(command);
             }
-            case "update" -> {
+                break;
+            case "update": {
                 byte[] data = new byte[parts.length - 2];
-                for (int i = 1; i < data.length; i++) data[i] = Byte.parseByte(parts[i+2]);
+                for (int i = 1; i < data.length; i++) data[i] = Byte.parseByte(parts[i + 2]);
                 if (targetId == this.nodeId) {
                     updateRouting(data);
                 } else {
@@ -484,7 +487,8 @@ public class Node implements Runnable {
                             .labelled(command);
                 }
             }
-            default -> throw new IllegalArgumentException("command not interpretable: " + command);
+                break;
+            default: throw new IllegalArgumentException("command not interpretable: " + command);
         }
 
     }

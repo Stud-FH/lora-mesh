@@ -20,12 +20,13 @@ public class ConsoleLogger implements Logger {
     }
 
     private String setColor(Logger.Severity severity) {
-        return switch (severity) {
-            case Debug -> "\u001B[61m";
-            case Info -> "\u001B[36m";
-            case Warn -> "\u001B[33m";
-            case Error -> "\u001B[31m";
-        };
+        switch (severity) {
+            case Debug: return "\u001B[61m";
+            case Info: return "\u001B[36m";
+            case Warn: return "\u001B[33m";
+            case Error: return "\u001B[31m";
+            default: return "";
+        }
     }
 
 }

@@ -13,6 +13,10 @@ public class Production {
 
     public static void main(String... args) throws Exception {
 
+        File projectRoot = new File(".");
+        System.out.println("project root: " + projectRoot.getAbsolutePath());
+
+
         File f1 = new File("./config/serial-id.txt");
         Scanner s1 = new Scanner(f1);
         long serialId = s1.nextLong();

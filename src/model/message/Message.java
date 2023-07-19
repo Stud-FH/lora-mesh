@@ -2,7 +2,15 @@ package model.message;
 
 import java.util.Arrays;
 
-public record Message(int header, byte... data) implements MessageHeader {
+public class Message implements MessageHeader {
+
+    public final int header;
+    public final byte[] data;
+
+    public Message(int header, byte... data) {
+        this.header = header;
+        this.data = data;
+    }
 
     public byte[] data() {
         byte[] copy = new byte[data.length];

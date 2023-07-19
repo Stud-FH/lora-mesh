@@ -8,11 +8,11 @@ public class JsonUtil {
     public static String stringify(NodeInfo data) {
         StringBuilder sb = new StringBuilder();
         sb.append("{")
-                .append("\"serialId\": ").append(data.serialId()).append(", ")
-                .append("\"nodeId\": ").append(data.nodeId()).append(", ")
-                .append("\"status\": ").append("\"").append(data.status()).append("\"").append(", ")
+                .append("\"serialId\": ").append(data.serialId).append(", ")
+                .append("\"nodeId\": ").append(data.nodeId).append(", ")
+                .append("\"status\": ").append("\"").append(data.status).append("\"").append(", ")
                 .append("\"retx\": {");
-        for (var entry : data.retx().entrySet()) sb.append(entry.getKey()).append(": ").append(entry.getValue()).append(", ");
+        for (var entry : data.retx.entrySet()) sb.append(entry.getKey()).append(": ").append(entry.getValue()).append(", ");
         sb.append("}}");
         return sb.toString();
     }

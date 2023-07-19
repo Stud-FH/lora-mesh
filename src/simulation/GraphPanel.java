@@ -182,14 +182,15 @@ public class GraphPanel extends JPanel {
     }
 
     private Color getColor(SimulatedLoRaMeshClient t) {
-        return switch (t.node.getStatus()) {
-            case Controller -> t == highlighted? CONTROLLER_H : CONTROLLER;
-            case Node -> t == highlighted? NODE_H : NODE;
-            case Joining -> t == highlighted? JOINING_H : JOINING;
-            case Seeking -> t == highlighted? SEEKING_H : SEEKING;
-            case Down -> t == highlighted? DOWN_H : DOWN;
-            case Error -> t == highlighted? ERROR_H : ERROR;
-        };
+        switch (t.node.getStatus()) {
+            case Controller: return t == highlighted? CONTROLLER_H : CONTROLLER;
+            case Node: return t == highlighted? NODE_H : NODE;
+            case Joining: return t == highlighted? JOINING_H : JOINING;
+            case Seeking: return t == highlighted? SEEKING_H : SEEKING;
+            case Down: return t == highlighted? DOWN_H : DOWN;
+            case Error: return t == highlighted? ERROR_H : ERROR;
+            default: return null;
+        }
     }
 
     /**

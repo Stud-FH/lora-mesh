@@ -117,5 +117,15 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
         return new Message(Integer.parseInt(raw.substring(0, 4), 16), raw.substring(4).getBytes());
     }
 
-    private record SendingItem(ChannelInfo channel, Message message, NodeInfo nodeInfo) {}
+    private static class SendingItem {
+        public final ChannelInfo channel;
+        public final Message message;
+        public final NodeInfo nodeInfo;
+
+        public SendingItem(ChannelInfo channel, Message message, NodeInfo nodeInfo) {
+            this.channel = channel;
+            this.message = message;
+            this.nodeInfo = nodeInfo;
+        }
+    }
 }

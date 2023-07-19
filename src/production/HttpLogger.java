@@ -26,9 +26,9 @@ public class HttpLogger implements Logger {
                     .POST(HttpRequest.BodyPublishers.ofString(
                             "{\"severity\": \"" + severity
                             + "\", \"text\": \"" + text
-                            + "\", \"nodeSerialId\": \"" + nodeInfo.serialId()
-                            + "\", \"nodeId\": \"" + nodeInfo.nodeId()
-                            + "\", \"nodeStatus\": \"" + nodeInfo.status()
+                            + "\", \"nodeSerialId\": \"" + nodeInfo.serialId
+                            + "\", \"nodeId\": \"" + nodeInfo.nodeId
+                            + "\", \"nodeStatus\": \"" + nodeInfo.status
                             + "\"}"))
                     .setHeader("Content-Type", "application/json")
                     .build();
