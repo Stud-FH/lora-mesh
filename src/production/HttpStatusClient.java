@@ -8,6 +8,7 @@ import java.net.http.HttpResponse;
 public class HttpStatusClient {
 
     private enum ActionCommand {
+        Reboot,
         GitPull
     }
 
@@ -22,7 +23,6 @@ public class HttpStatusClient {
 
     public void status() {
         try {
-
             var proc = new ProcessBuilder().command("ip", "a");
             var stream = proc.start().getInputStream();
 
@@ -33,13 +33,9 @@ public class HttpStatusClient {
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
-            System.out.println("status: " + response.body());
+            // TODO execute command based on status answer
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public static void main(String... args) throws Exception {
-
     }
 }

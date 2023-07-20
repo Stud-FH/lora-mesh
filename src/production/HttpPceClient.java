@@ -33,7 +33,7 @@ public class HttpPceClient implements PceClient {
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
-            System.out.println(response.body());
+            return new ChannelInfo(response.body());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -73,18 +73,11 @@ public class HttpPceClient implements PceClient {
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
+            // TODO
             System.out.println(response.body());
         } catch (Exception e) {
             e.printStackTrace();
         }
         return new ArrayList<>();
-    }
-
-    // test
-    public static void main(String... args) {
-        var client = new HttpPceClient("http://localhost:8080");
-        var result = client.heartbeat(new NodeInfo(-1L, NodeStatus.Down, -1, new HashMap<>()));
-        System.out.println(result);
-
     }
 }

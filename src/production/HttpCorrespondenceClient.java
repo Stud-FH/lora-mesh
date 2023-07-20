@@ -75,6 +75,7 @@ public class HttpCorrespondenceClient implements CorrespondenceClient {
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
+            // TODO
             System.out.println(response.body());
         } catch (Exception e) {
             e.printStackTrace();

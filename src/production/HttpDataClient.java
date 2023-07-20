@@ -49,13 +49,4 @@ public class HttpDataClient implements DataSinkClient {
             e.printStackTrace();
         }
     }
-
-    // test
-    public static void main(String... args) {
-        var client = new HttpDataClient("http://localhost:8080");
-        var result = client.heartbeat();
-        System.out.println(result);
-        client.feed(new Message(1234, "test".getBytes()));
-
-    }
 }

@@ -38,9 +38,4 @@ public class HttpLogger implements Logger {
             e.printStackTrace();
         }
     }
-
-    // test
-    public static void main(String... args) {
-        new HttpLogger("http://localhost:8080").log(Severity.Debug, "test", new NodeInfo(-1L, NodeStatus.Down, -1, new HashMap<>()));
-    }
 }

@@ -35,10 +35,6 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
         Exec.repeat(this::tick, getSendingIntervalMillis());
     }
 
-    public static void main(String... args) {
-        // tests
-    }
-
     private void tick() {
 
         while (listeningScanner != null && listeningScanner.hasNext("\\w*" + startingSymbol + "\\w*" + terminalSymbol)) {
