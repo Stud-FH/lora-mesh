@@ -44,7 +44,7 @@ public class HttpPceClient implements PceClient {
     public byte allocateNodeId(long serialId, byte mediatorId, double mediatorRetx) {
         try {
             var request = HttpRequest.newBuilder(new URI(String.format
-                            ("%s/node-id?serialId=%d&mediatorId=%d&mediatorRetx=%,.4f",
+                            ("%s/pce/node-id?serialId=%d&mediatorId=%d&mediatorRetx=%,.4f",
                                     baseUrl, serialId, mediatorId, mediatorRetx)))
                     .POST(HttpRequest.BodyPublishers.noBody())
                     .setHeader("Content-Type", "application/json")
@@ -67,7 +67,7 @@ public class HttpPceClient implements PceClient {
     public List<String> feed(long controllerId, Message message) {
         try {
             var request = HttpRequest.newBuilder(new URI(String.format
-                            ("%s/feed?controllerSerialId=%d", baseUrl, controllerId)))
+                            ("%s/pce/feed?controllerSerialId=%d", baseUrl, controllerId)))
                     .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.fromRetxMessage(message)))
                     .setHeader("Content-Type", "application/json")
                     .build();
