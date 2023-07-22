@@ -32,11 +32,36 @@ public class Production {
         var logger = new HttpLogger(apiUrl);
         var meshClient = new E32LoRaMeshClient(logger);
 
+        File f3 = new File("./config/options.txt");
+        Scanner s3 = new Scanner(f3);
+        while (s3.hasNextLine()) {
+            switch (s3.nextLine()) {
+                case "disable pce": pceClient.disabled = true;
+                break;
+                case "disable data": dataClient.disabled = true;
+                break;
+            }
+        }
+        s3.close();
+
         var node = new Node(serialId, meshClient, dataClient, pceClient, logger);
 
         Exec.run(node, 50);
 
         var statusClient = new HttpStatusClient(apiUrl, serialId);
         Exec.repeat(statusClient::status, 3600000);
+
+        Exec.repeat(() -> node.feedData(temperature()), 10000, 3000);
+    }
+
+    static byte[] temperature() {
+        try {
+            var proc = new ProcessBuilder().command("vcgencmd", "measure_temp");
+            var stream = proc.start().getInputStream();
+            return new String(stream.readAllBytes()).getBytes();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "error".getBytes();
+        }
     }
 }

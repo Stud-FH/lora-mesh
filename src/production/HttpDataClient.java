@@ -13,12 +13,15 @@ public class HttpDataClient implements DataSinkClient {
     private final String baseUrl;
     HttpClient http = Production.http;
 
+    public boolean disabled = false;
+
     public HttpDataClient(String baseUrl) {
         this.baseUrl = baseUrl;
     }
 
     @Override
     public boolean heartbeat() {
+        if (disabled) return false;
         try {
             var request = HttpRequest.newBuilder(new URI(baseUrl + "/data"))
                     .GET()
@@ -37,10 +40,7 @@ public class HttpDataClient implements DataSinkClient {
     public void feed(Message message) {
         try {
             var request = HttpRequest.newBuilder(new URI(baseUrl + "/data"))
-                    .POST(HttpRequest.BodyPublishers.ofString(
-                            "{\"header\": " + message.header()
-                                    + ", \"data\": \"" + message.dataAsString()
-                                    + "\"}"))
+                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.message(message)))
                     .setHeader("Content-Type", "application/json")
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.discarding());

@@ -1,7 +1,7 @@
 package simulation;
 
-import model.*;
 import model.Observer;
+import model.*;
 import model.execution.Exec;
 import model.message.Message;
 import model.message.MessageType;

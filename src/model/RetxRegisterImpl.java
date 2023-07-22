@@ -4,7 +4,10 @@ import model.message.Message;
 import model.message.MessageHeader;
 import model.message.MessageType;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
 
 public class RetxRegisterImpl implements RetxRegister {
 

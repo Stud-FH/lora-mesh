@@ -1,7 +1,12 @@
 package simulation;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import java.util.function.Consumer;
 
 public class Simulation implements Serializable {

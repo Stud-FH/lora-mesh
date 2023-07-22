@@ -10,7 +10,6 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.util.Comparator;
-import java.util.concurrent.TimeUnit;
 
 public class GraphPanel extends JPanel {
 

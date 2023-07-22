@@ -1,6 +1,9 @@
 package simulation;
 
-import model.*;
+import model.ChannelInfo;
+import model.CorrespondenceClient;
+import model.LocalCorrespondenceClient;
+import model.PceClient;
 import model.message.*;
 
 import java.util.*;

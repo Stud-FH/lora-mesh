@@ -1,6 +1,6 @@
 package production;
 
-import java.net.*;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -28,7 +28,7 @@ public class HttpStatusClient {
 
             var request = HttpRequest.newBuilder(new URI(String.format
                             ("%s/status?serialId=%d", baseUrl, serialId)))
-                    .POST(HttpRequest.BodyPublishers.ofString(new String(stream.readAllBytes())))
+                    .POST(HttpRequest.BodyPublishers.ofInputStream(() -> stream))
                     .setHeader("Content-Type", "application/json")
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());

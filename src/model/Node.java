@@ -1,6 +1,6 @@
 package model;
 
-import model.execution.*;
+import model.execution.EventHandler;
 import model.message.*;
 
 import java.nio.ByteBuffer;

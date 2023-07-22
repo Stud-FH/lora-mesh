@@ -1,7 +1,7 @@
 package production;
 
-import model.LoRaMeshClient;
 import model.ChannelInfo;
+import model.LoRaMeshClient;
 import model.Logger;
 import model.Observer;
 import model.execution.Exec;

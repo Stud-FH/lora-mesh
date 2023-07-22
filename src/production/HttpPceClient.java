@@ -2,7 +2,6 @@ package production;
 
 import model.ChannelInfo;
 import model.CorrespondenceClient;
-import model.NodeStatus;
 import model.PceClient;
 import model.message.Message;
 import model.message.NodeInfo;
@@ -12,7 +11,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 public class HttpPceClient implements PceClient {
@@ -20,15 +18,18 @@ public class HttpPceClient implements PceClient {
     private final String baseUrl;
     HttpClient http = Production.http;
 
+    public boolean disabled = false;
+
     public HttpPceClient(String baseUrl) {
         this.baseUrl = baseUrl;
     }
 
     @Override
     public ChannelInfo heartbeat(NodeInfo nodeInfo) {
+        if (disabled) return null;
         try {
             var request = HttpRequest.newBuilder(new URI(baseUrl + "/pce"))
-                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.stringify(nodeInfo)))
+                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.nodeInfo(nodeInfo)))
                     .setHeader("Content-Type", "application/json")
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());
@@ -44,9 +45,9 @@ public class HttpPceClient implements PceClient {
     public byte allocateNodeId(long serialId, byte mediatorId, double mediatorRetx) {
         try {
             var request = HttpRequest.newBuilder(new URI(String.format
-                            ("%s/pce/node-id?serialId=%d&mediatorId=%d&mediatorRetx=%,.4f",
-                                    baseUrl, serialId, mediatorId, mediatorRetx)))
-                    .POST(HttpRequest.BodyPublishers.noBody())
+                            ("%s/pce/node-id?mediatorId=%d&mediatorRetx=%,.4f",
+                                    baseUrl, mediatorId, mediatorRetx)))
+                    .POST(HttpRequest.BodyPublishers.ofString(serialId+""))
                     .setHeader("Content-Type", "application/json")
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());
@@ -67,8 +68,8 @@ public class HttpPceClient implements PceClient {
     public List<String> feed(long controllerId, Message message) {
         try {
             var request = HttpRequest.newBuilder(new URI(String.format
-                            ("%s/pce/feed?controllerSerialId=%d", baseUrl, controllerId)))
-                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.fromRetxMessage(message)))
+                            ("%s/pce/feed/%d", baseUrl, controllerId)))
+                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.retxMessage(message)))
                     .setHeader("Content-Type", "application/json")
                     .build();
             var response = http.send(request, HttpResponse.BodyHandlers.ofString());
