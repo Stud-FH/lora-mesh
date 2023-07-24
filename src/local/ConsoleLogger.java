@@ -1,21 +1,25 @@
-package simulation;
+package local;
 
 import model.Logger;
-import model.message.NodeInfo;
+import model.NodeInfo;
+
+import java.util.function.Supplier;
 
 public class ConsoleLogger implements Logger {
 
-    private final SimulatedLoRaMeshClient simT;
+    private final Supplier<Severity> logLevelSupplier;
+    private final Supplier<String> labelSupplier;
 
-    public ConsoleLogger(SimulatedLoRaMeshClient simT) {
-        this.simT = simT;
+    public ConsoleLogger(Supplier<Severity> logLevelSupplier, Supplier<String> labelSupplier) {
+        this.logLevelSupplier = logLevelSupplier;
+        this.labelSupplier = labelSupplier;
     }
 
     @Override
     public void log(Logger.Severity severity, String text, NodeInfo nodeInfo) {
-        if (severity.ordinal() < simT.logLevel.ordinal()) return;
+        if (severity.ordinal() < logLevelSupplier.get().ordinal()) return;
 //        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-        System.out.printf("%s%3s: %s >> %s", setColor(severity), simT.name, nodeInfo, text);
+        System.out.printf("%s%3s: %s >> %s", setColor(severity), labelSupplier.get(), nodeInfo, text);
         System.out.println("\u001B[0m");
     }
 

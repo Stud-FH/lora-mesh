@@ -1,6 +1,4 @@
-package model.message;
-
-import model.NodeStatus;
+package model;
 
 import java.util.Map;
 
@@ -15,5 +13,15 @@ public class NodeInfo {
         this.status = status;
         this.nodeId = nodeId;
         this.retx = retx;
+    }
+
+    @Override
+    public String toString() {
+        return "NodeInfo{" +
+                "serialId=" + serialId +
+                ", status=" + status +
+                ", nodeId=" + nodeId +
+                ", retx=" + retx +
+                '}';
     }
 }

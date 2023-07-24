@@ -1,10 +1,14 @@
 package simulation;
 
+import local.LocalCorrespondenceClient;
 import model.ChannelInfo;
 import model.CorrespondenceClient;
-import model.LocalCorrespondenceClient;
 import model.PceClient;
-import model.message.*;
+import model.message.Message;
+import model.message.MessageHeader;
+import model.message.MessageType;
+import model.message.MessageUtil;
+import model.NodeInfo;
 
 import java.util.*;
 import java.util.stream.Collectors;

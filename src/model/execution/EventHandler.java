@@ -1,6 +1,6 @@
 package model.execution;
 
-import model.Node;
+import local.Node;
 
 import java.util.ArrayList;
 import java.util.Collection;

@@ -1,41 +1,31 @@
 package production;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import local.BashClient;
+import local.FileClient;
 
 public class HttpStatusClient {
 
-    private enum ActionCommand {
-        Reboot,
-        GitPull
-    }
+    private final HttpRequestClient httpRequestClient;
+    private final BashClient bashClient;
+    private final FileClient fileClient;
 
-    private final String baseUrl;
-    private final long serialId;
-    HttpClient http = Production.http;
-
-    public HttpStatusClient(String baseUrl, long serialId) {
-        this.baseUrl = baseUrl;
-        this.serialId = serialId;
+    public HttpStatusClient(HttpRequestClient httpRequestClient, BashClient bashClient, FileClient fileClient) {
+        this.httpRequestClient = httpRequestClient;
+        this.bashClient = bashClient;
+        this.fileClient = fileClient;
     }
 
     public void status() {
-        try {
-            var proc = new ProcessBuilder().command("ip", "a");
-            var stream = proc.start().getInputStream();
+        var data = bashClient.run("ip", "a");
+        var response = httpRequestClient.postResponseBinary(String.format("/status/%d", Config.serialId), data);
+        fileClient.write("config.txt", response);
+    }
 
-            var request = HttpRequest.newBuilder(new URI(String.format
-                            ("%s/status?serialId=%d", baseUrl, serialId)))
-                    .POST(HttpRequest.BodyPublishers.ofInputStream(() -> stream))
-                    .setHeader("Content-Type", "application/json")
-                    .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) throw new Exception(response.toString());
-            // TODO execute command based on status answer
-        } catch (Exception e) {
-            e.printStackTrace();
+    public void update() {
+        long lastModified = fileClient.lastModified("node.jar");
+        byte[] binary = httpRequestClient.getResponseBinary(String.format("/status?lm=%d", lastModified));
+        if (binary.length > 0) {
+            fileClient.write("node.jar", binary);
         }
     }
 }

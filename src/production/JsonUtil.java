@@ -2,7 +2,7 @@ package production;
 
 import model.LogEntry;
 import model.message.Message;
-import model.message.NodeInfo;
+import model.NodeInfo;
 
 import java.util.Map;
 
@@ -35,19 +35,6 @@ public class JsonUtil {
                 .append(key("nodeInfo")).append(nodeInfo(data.nodeInfo)).append(", ")
                 .append(key("data")).append(bytes(data.data))
                 .append("}");
-        return sb.toString();
-    }
-
-    public static String retxMessage(Message message) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{")
-                .append(key("nodeId")).append(message.getNodeId()).append(", ")
-                .append(key("retx")).append("{");
-        if (message.data.length >= 2) {
-            for (int i = 0; i+1 < message.dataLength(); i += 2) sb.append(message.data(i)).append(": ").append(message.data(i+1)).append(", ");
-            sb.delete(sb.length() - 2, sb.length());
-        }
-        sb.append("}}");
         return sb.toString();
     }
 

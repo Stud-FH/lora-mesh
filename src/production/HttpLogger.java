@@ -2,20 +2,18 @@ package production;
 
 import model.LogEntry;
 import model.Logger;
-import model.message.NodeInfo;
+import model.NodeInfo;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.util.function.Supplier;
 
 public class HttpLogger implements Logger {
 
-    private final String baseUrl;
-    HttpClient http = Production.http;
+    private final HttpRequestClient httpRequestClient;
+    private final Supplier<Logger> backupLogger;
 
-    public HttpLogger(String baseUrl) {
-        this.baseUrl = baseUrl;
+    public HttpLogger(HttpRequestClient httpRequestClient, Supplier<Logger> backupLogger) {
+        this.httpRequestClient = httpRequestClient;
+        this.backupLogger = backupLogger;
     }
 
     @Override
@@ -25,14 +23,9 @@ public class HttpLogger implements Logger {
         data.nodeInfo = nodeInfo;
         data.data = text.getBytes();
         try {
-            var request = HttpRequest.newBuilder(new URI(baseUrl + "/log"))
-                    .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.logEntry(data)))
-                    .setHeader("Content-Type", "application/json")
-                    .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.discarding());
-            if (response.statusCode() != 200) throw new Exception(response.toString());
+            httpRequestClient.postResponseVoid("/log", JsonUtil.logEntry(data));
         } catch (Exception e) {
-            e.printStackTrace();
+            backupLogger.get().log(severity, text, nodeInfo);
         }
     }
 }

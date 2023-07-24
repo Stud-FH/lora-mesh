@@ -5,28 +5,23 @@ import model.message.Message;
 import model.message.MessageHeader;
 import model.message.MessageType;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
 public class HttpCorrespondenceClient implements CorrespondenceClient {
 
-    private final String baseUrl;
     private final byte nodeId;
-    HttpClient http = Production.http;
+    private final HttpRequestClient httpRequestClient;
     boolean valid = true;
 
-    public HttpCorrespondenceClient(String baseUrl, byte nodeId) {
-        this.baseUrl = baseUrl;
+    public HttpCorrespondenceClient(byte nodeId, HttpRequestClient httpRequestClient) {
         this.nodeId = nodeId;
+        this.httpRequestClient = httpRequestClient;
     }
 
     @Override
     public Message pack(MessageType type, byte... data) {
         if (!valid) throw new IllegalStateException("HttpCorrespondenceClient can only be used once");
         valid = false;
-        int counter = getCounter(false);
+        var response = httpRequestClient.getResponseString(String.format("/correspondence/out/%d", nodeId));
+        int counter = Integer.parseInt(response);
         int header = type.getHeaderBinary()
                 | (nodeId << MessageHeader.ADDRESS_SHIFT)
                 | MessageHeader.DOWNWARDS_BIT
@@ -38,7 +33,8 @@ public class HttpCorrespondenceClient implements CorrespondenceClient {
     public Message packAndIncrement(MessageType type, byte... data) {
         if (!valid) throw new IllegalStateException("HttpCorrespondenceClient can only be used once");
         valid = false;
-        int counter = getCounter(true);
+        var response = httpRequestClient.postResponseString(String.format("/correspondence/out/%d", nodeId), "");
+        int counter = Integer.parseInt(response);
         int header = type.getHeaderBinary()
                 | (nodeId << MessageHeader.ADDRESS_SHIFT)
                 | MessageHeader.DOWNWARDS_BIT
@@ -46,42 +42,15 @@ public class HttpCorrespondenceClient implements CorrespondenceClient {
         return new Message(header, data);
     }
 
-    private int getCounter(boolean increment) {
-        try {
-            var request = HttpRequest.newBuilder(new URI(String.format
-                            ("%s/correspondence/out?nodeId=%d?increment=%s", baseUrl, nodeId, increment)))
-                    .GET()
-                    .setHeader("Content-Type", "application/json")
-                    .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) throw new Exception(response.toString());
-            return Integer.parseInt(response.body());
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
     @Override
     public byte[] registerAndListLosses(Message message) {
         if (!valid) throw new IllegalStateException("HttpCorrespondenceClient can only be used once");
         valid = false;
 
-        try {
-            var request = HttpRequest.newBuilder(new URI(String.format
-                            ("%s/correspondence/in?nodeId=%d?counter=%d", baseUrl, nodeId, message.getCounter())))
-                    .GET()
-                    .setHeader("Content-Type", "application/json")
-                    .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) throw new Exception(response.toString());
-            // TODO
-            System.out.println(response.body());
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
+        var response = httpRequestClient.postResponseString("/correspondence/in", message.header + "");
+        // TODO
+        System.out.println(response);
 
-        return new byte[0];
+        return new byte[]{};
     }
 }

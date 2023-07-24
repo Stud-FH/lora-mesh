@@ -1,5 +1,6 @@
-package model;
+package local;
 
+import model.CorrespondenceClient;
 import model.message.Message;
 import model.message.MessageHeader;
 import model.message.MessageType;

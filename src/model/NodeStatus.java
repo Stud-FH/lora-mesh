@@ -6,5 +6,5 @@ public enum NodeStatus {
     Seeking,
     Joining,
     Node,
-    Controller;
+    Controller
 }

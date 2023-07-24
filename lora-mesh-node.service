@@ -1,0 +1,11 @@
+[Unit]
+Description=LoRa Mesh Node Autostart
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /home/pi/lora-mesh/launch.sh
+WorkingDirectory=/home/pi
+
+[Install]
+WantedBy=multi-user.target

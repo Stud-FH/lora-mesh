@@ -1,21 +1,25 @@
-package model;
+package local;
 
+import model.*;
+import model.Module;
 import model.execution.EventHandler;
-import model.message.*;
+import model.message.Message;
+import model.message.MessageHeader;
+import model.message.MessageType;
+import model.message.MessageUtil;
 
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
 
-public class Node implements Runnable {
+public class Node implements Module, Runnable {
 
-    public static final int STATUS_CHECK_INTERVAL = 100;
-    public static final int HELLO_INTERVAL = 20;
-    public static final int RENDEZVOUS_INTERVAL = 50;
-    public static final int ROUTING_INTERVAL = 200;
-    public static final int TRACING_PERIOD = 10;
-    public static final int JOIN_VOLLEY_AMOUNT = 10;
-    public static final int INVITE_VOLLEY_AMOUNT = 5;
+    public static final int STATUS_CHECK_PERIOD = 60000;
+    public static final int HELLO_PERIOD = 19000;
+    public static final int RENDEZVOUS_PERIOD = 65000;
+    public static final int ROUTING_PERIOD = 120000;
+    public static final int TRACING_VOLLEY = 10;
+    public static final int JOIN_VOLLEY = 10;
 
     private static final String TRANSMITTER_COOLDOWN_EVENT_KEY = "tc";
 
@@ -40,16 +44,16 @@ public class Node implements Runnable {
     private final PceClient pceClient;
     private final DataSinkClient dataSinkClient;
     private boolean dataSinkConnected = false;
-    private final Logger logger;
+    private final ApplicationContext ctx;
 
     private Consumer<Message> messageHandler;
 
-    public Node(long serialId, LoRaMeshClient meshClient, DataSinkClient dataSinkClient, PceClient pceClient, Logger logger) {
+    public Node(long serialId, LoRaMeshClient meshClient, DataSinkClient dataSinkClient, PceClient pceClient, ApplicationContext ctx) {
         this.serialId = serialId;
         this.meshClient = meshClient;
         this.dataSinkClient = dataSinkClient;
         this.pceClient = pceClient;
-        this.logger = logger;
+        this.ctx = ctx;
     }
 
     public boolean isAlive() {
@@ -58,42 +62,42 @@ public class Node implements Runnable {
 
     public void statusCheck() {
         switch (status) {
-            case Controller:
-                meshChannel = pceClient.heartbeat(info());
-                if (meshChannel == null) error("disconnected");
-                dataSinkConnected = dataSinkClient.heartbeat();
-                break;
-
             case Node:
                 var result = pceClient.heartbeat(info());
                 if (result != null) error("connected");
+                dataSinkConnected = dataSinkClient.heartbeat();
+                break;
+
+            case Controller:
+                meshChannel = pceClient.heartbeat(info());
+                if (meshChannel == null) error("disconnected");
                 dataSinkConnected = dataSinkClient.heartbeat();
                 break;
         }
     }
 
     public void debug(String format, Object... args) {
-        if (logger == null) return;
+        var logger = ctx.resolve(Logger.class);
         logger.debug(String.format(format, args), info());
     }
 
     public void info(String format, Object... args) {
-        if (logger == null) return;
+        var logger = ctx.resolve(Logger.class);
         logger.info(String.format(format, args), info());
     }
 
     public void warn(String format, Object... args) {
-        if (logger == null) return;
+        var logger = ctx.resolve(Logger.class);
         logger.warn(String.format(format, args), info());
     }
 
     public void error(String format, Object... args) {
         handler.abortAndReset();
         status = NodeStatus.Error;
-        if (logger == null) return;
+        var logger = ctx.resolve(Logger.class);
+        var bash = ctx.resolve(BashClient.class);
         logger.error(String.format(format, args), info());
-        handler.scheduled("recover", System.currentTimeMillis() + 1000)
-                .then(this);
+        bash.run("sudo", "reboot");
     }
 
     public void run() {
@@ -101,7 +105,7 @@ public class Node implements Runnable {
             warn("wake up called on live node");
             return;
         } else {
-            debug("wake up");
+            debug("launch");
         }
 
         dataSinkConnected = dataSinkClient.heartbeat();
@@ -151,25 +155,10 @@ public class Node implements Runnable {
         nodeId = -1;
         status = NodeStatus.Seeking;
 
-        meshClient.listen(ChannelInfo.rendezvous, new Observer<>() {
-            boolean disposed = false;
-
-            @Override
-            public void next(Message message) {
-                meshChannel = MessageUtil.rendezvousDataToChannelInfo(message.data());
-                join();
-            }
-
-            @Override
-            public boolean isExpired() {
-                return disposed ||  nodeId != -1;
-            }
-
-            @Override
-            public void dispose() {
-                disposed = true;
-            }
-        }, this::info);
+        meshClient.listen(ChannelInfo.rendezvous, new MessageObserver(m -> {
+            meshChannel = MessageUtil.rendezvousDataToChannelInfo(m.data());
+            join();
+        }, () -> nodeId != -1), this::info);
     }
 
     private void join() {
@@ -189,25 +178,9 @@ public class Node implements Runnable {
             }
         };
 
-        meshClient.listen(meshChannel, new Observer<>() {
-            boolean disposed = false;
-            @Override
-            public void next(Message message) {
-                messageHandler.accept(message);
-            }
+        meshClient.listen(meshChannel, new MessageObserver(messageHandler, this::isAlive), this::info);
 
-            @Override
-            public boolean isExpired() {
-                return disposed || !isAlive();
-            }
-
-            @Override
-            public void dispose() {
-                disposed = true;
-            }
-        }, this::info);
-
-        for (int i = 0; i < JOIN_VOLLEY_AMOUNT; i++) {
+        for (int i = 0; i < JOIN_VOLLEY; i++) {
             send(hello.packAndIncrement(MessageType.Hello, data));
         }
     }
@@ -220,26 +193,11 @@ public class Node implements Runnable {
         retxRegister = new RetxRegisterImpl();
         status = controller? NodeStatus.Controller : NodeStatus.Node;
 
-        handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
-                .then(this::statusCheck)
-                .labelled("status check")
-                .reactEvery(STATUS_CHECK_INTERVAL);
-
-        handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
-                .then(() -> send(generateHello()))
-                .labelled("hello")
-                .reactEvery(HELLO_INTERVAL);
-
-        handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
-                .then(() -> meshClient.enqueue(ChannelInfo.rendezvous,
-                        new Message(0, MessageUtil.channelInfoToRendezvousData(meshChannel)), info()))
-                .labelled("rendezvous")
-                .reactEvery(RENDEZVOUS_INTERVAL);
-
-        handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
-                .then(() -> send(generateNetworkData()))
-                .labelled("routing")
-                .reactEvery(ROUTING_INTERVAL);
+        Exec.repeat(this::statusCheck, STATUS_CHECK_PERIOD);
+        Exec.repeat(() -> send(generateHello()), HELLO_PERIOD);
+        Exec.repeat(() -> meshClient.enqueue(ChannelInfo.rendezvous,
+                new Message(0, MessageUtil.channelInfoToRendezvousData(meshChannel)), info()), RENDEZVOUS_PERIOD);
+        Exec.repeat(() -> send(generateNetworkData()), ROUTING_PERIOD);
 
         messageHandler = controller? this::handleMessageAsController : this::handleMessageAsNode;
     }
@@ -278,9 +236,9 @@ public class Node implements Runnable {
             joinCounter.compute(code, (k, v) -> {
 
                 if (v == null) {
-                    handler.delayed("join " + code, () -> meshClient.getSendingIntervalMillis() * JOIN_VOLLEY_AMOUNT * 2)
+                    handler.delayed("join " + code, () -> meshClient.getSendingIntervalMillis() * JOIN_VOLLEY * 2)
                             .then(() -> {
-                                byte reliability = (byte) (255f * joinCounter.remove(code) / JOIN_VOLLEY_AMOUNT);
+                                byte reliability = (byte) (255f * joinCounter.remove(code) / JOIN_VOLLEY);
                                 byte[] data = message.data();
                                 data[0] = reliability;
                                 send(uplink.packAndIncrement(MessageType.UpwardsJoin, data));
@@ -344,7 +302,7 @@ public class Node implements Runnable {
             handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
                     .then(() -> send(message))
                     .labelled("invite " + assignedId)
-                    .reactEvery(HELLO_INTERVAL + 1)
+                    .reactEvery(HELLO_PERIOD + 1)
                     .invalidateIf(() -> retxRegister.knows(assignedId));
 
         } else if (MessageType.Downwards.matches(message) && shouldForward(message)) {
@@ -394,7 +352,7 @@ public class Node implements Runnable {
             data[i++] = (byte) (tracingHeader >>> MessageHeader.ADDRESS_SHIFT);
             data[i++] = (byte) (tracingHeader >>> MessageHeader.COUNTER_SHIFT);
             int counter = entry.getValue() + 1;
-            if (counter >= TRACING_PERIOD) traceCounter.remove(tracingHeader);
+            if (counter >= TRACING_VOLLEY) traceCounter.remove(tracingHeader);
             else traceCounter.put(tracingHeader, counter);
         }
         return hello.packAndIncrement(MessageType.Hello, data);
@@ -461,7 +419,7 @@ public class Node implements Runnable {
                     handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
                             .then(() -> send(message))
                             .labelled(command)
-                            .invalidateAfter(JOIN_VOLLEY_AMOUNT);
+                            .invalidateAfter(JOIN_VOLLEY);
                 } else {
                     handler.immediate(command)
                             .then(() -> send(message));
@@ -493,4 +451,13 @@ public class Node implements Runnable {
 
     }
 
+    @Override
+    public Collection<Class<? extends Module>> dependencies() {
+        return Set.of(Logger.class, BashClient.class, DataSinkClient.class, PceClient.class, LoRaMeshClient.class);
+    }
+
+    @Override
+    public Collection<Class<? extends Module>> providers() {
+        return Set.of(Node.class);
+    }
 }

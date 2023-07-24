@@ -1,4 +1,4 @@
-package model;
+package local;
 
 import model.message.Message;
 import model.message.MessageHeader;

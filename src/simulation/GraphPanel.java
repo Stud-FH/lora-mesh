@@ -1,6 +1,6 @@
 package simulation;
 
-import model.execution.Exec;
+import local.Exec;
 import model.message.MessageHeader;
 
 import javax.swing.*;

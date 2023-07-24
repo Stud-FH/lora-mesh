@@ -1,8 +1,9 @@
 package model;
 
-import model.message.NodeInfo;
+import java.util.Collection;
+import java.util.Set;
 
-public interface Logger {
+public interface Logger extends Module {
 
     enum Severity {
         Debug,
@@ -29,4 +30,8 @@ public interface Logger {
         log(Severity.Error, text, nodeInfo);
     }
 
+    @Override
+    default Collection<Class<? extends Module>> providers() {
+        return Set.of(Logger.class);
+    }
 }

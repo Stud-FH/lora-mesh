@@ -140,15 +140,11 @@ public class ControlPanel extends JPanel {
         grid.add(logLevel);
 
         JButton kill = new JButton("kill");
-        kill.addActionListener(a -> {
-            simulation.getSelected().node.error("killed");
-        });
+        kill.addActionListener(a -> simulation.getSelected().node.error("killed"));
         grid.add(kill);
 
         JButton promote = new JButton("toggle api");
-        promote.addActionListener(a -> {
-            simulation.getSelected().setController(!simulation.getSelected().isController());
-        });
+        promote.addActionListener(a -> simulation.getSelected().setController(!simulation.getSelected().isController()));
         grid.add(promote);
 
         JButton sendData = new JButton("send data");

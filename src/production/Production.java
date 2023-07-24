@@ -1,67 +1,61 @@
 package production;
 
-import model.Node;
-import model.execution.Exec;
+import local.*;
+import model.ApplicationContext;
+import model.Logger;
+import local.Node;
+import model.NodeInfo;
+import testing.PseudoDataSinkClient;
+import testing.PseudoPceClient;
 
-import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
-import java.util.Scanner;
+import java.util.function.Supplier;
 
 public class Production {
 
     public static final HttpClient http = HttpClient.newHttpClient();
 
-    public static void main(String... args) throws Exception {
+    private static Node node;
+    private static Logger consoleLogger;
+    private static Logger fileLogger;
 
-        File projectRoot = new File(".");
-        System.out.println("project root: " + projectRoot.getAbsolutePath());
+    public static void main(String... args) throws URISyntaxException {
 
+        System.out.println("initializing LoRa Mesh Node...");
 
-        File f1 = new File("./config/serial-id.txt");
-        Scanner s1 = new Scanner(f1);
-        long serialId = s1.nextLong();
-        s1.close();
+        if (Config.missing("api")) throw new IllegalStateException("api must be specified in config.txt");
+        String apiUrl = Config.var("api");
+        boolean pceDisabled = Config.var("pce").equals("disabled");
+        boolean dataSinkDisabled = Config.var("data").equals("disabled");
+        Logger.Severity logLevel = Logger.Severity.valueOf(Config.var("log", Logger.Severity.Debug.name()));
 
-        File f2 = new File("./config/api-url.txt");
-        Scanner s2 = new Scanner(f2);
-        String apiUrl = s2.nextLine();
-        s2.close();
+        ApplicationContext ctx = new ApplicationContext();
 
-        var dataClient = new HttpDataClient(apiUrl);
-        var pceClient = new HttpPceClient(apiUrl);
-        var logger = new HttpLogger(apiUrl);
-        var meshClient = new E32LoRaMeshClient(logger);
+        Supplier<NodeInfo> nodeInfo = () -> node.info();
+        consoleLogger = new ConsoleLogger(() -> logLevel, () -> "prd");
+        var fileClient = new FileClient(consoleLogger, nodeInfo);
+        fileLogger = new FileLogger(fileClient, () -> consoleLogger);
+        var httpRequestClient = new HttpRequestClient(new URI(apiUrl), fileLogger, () -> node.info());
+        Logger httpLogger = new HttpLogger(httpRequestClient, () -> fileLogger);
+        var bashClient = new BashClient(httpLogger, nodeInfo);
+        var dataClient = dataSinkDisabled? new PseudoDataSinkClient() : new HttpDataClient(httpRequestClient);
+        var pceClient =  pceDisabled ? new PseudoPceClient() : new HttpPceClient(httpRequestClient);
+        var meshClient = new E32LoRaMeshClient(fileClient, bashClient, httpLogger);
+        var statusClient = new HttpStatusClient(httpRequestClient, bashClient, fileClient);
 
-        File f3 = new File("./config/options.txt");
-        Scanner s3 = new Scanner(f3);
-        while (s3.hasNextLine()) {
-            switch (s3.nextLine()) {
-                case "disable pce": pceClient.disabled = true;
-                break;
-                case "disable data": dataClient.disabled = true;
-                break;
-            }
-        }
-        s3.close();
-
-        var node = new Node(serialId, meshClient, dataClient, pceClient, logger);
+        node = new Node(Config.serialId, meshClient, dataClient, pceClient, httpLogger);
 
         Exec.run(node, 50);
 
-        var statusClient = new HttpStatusClient(apiUrl, serialId);
-        Exec.repeat(statusClient::status, 3600000);
+        Exec.repeat(statusClient::update, 300000);
+        Exec.repeat(statusClient::status, 300000, 100);
 
-        Exec.repeat(() -> node.feedData(temperature()), 10000, 3000);
+        Exec.repeat(() -> node.feedData(bashClient.run("vcgencmd", "measure_temp")), 10000, 3000);
     }
 
-    static byte[] temperature() {
-        try {
-            var proc = new ProcessBuilder().command("vcgencmd", "measure_temp");
-            var stream = proc.start().getInputStream();
-            return new String(stream.readAllBytes()).getBytes();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "error".getBytes();
-        }
+    static {
+
     }
 }

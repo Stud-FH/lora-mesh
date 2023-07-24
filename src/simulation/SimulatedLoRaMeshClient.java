@@ -1,11 +1,15 @@
 package simulation;
 
+import local.ConsoleLogger;
+import local.Exec;
+import model.ChannelInfo;
+import model.LoRaMeshClient;
+import model.Logger;
 import model.Observer;
-import model.*;
-import model.execution.Exec;
 import model.message.Message;
 import model.message.MessageType;
-import model.message.NodeInfo;
+import local.Node;
+import model.NodeInfo;
 
 import java.io.Serializable;
 import java.util.*;
@@ -44,7 +48,7 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
                 this,
                 data,
                 pce,
-                new ConsoleLogger(this));
+                new ConsoleLogger(() -> logLevel, () -> name));
         Exec.run(node, delay);
         return this;
     }
