@@ -1,46 +1,49 @@
 package production;
 
-import local.BashClient;
-import local.Exec;
+import local.CommandLine;
 import local.FileClient;
-import model.ChannelInfo;
-import model.LoRaMeshClient;
-import model.Logger;
 import model.Module;
 import model.Observer;
+import model.*;
+import model.Executor;
 import model.message.Message;
-import model.NodeInfo;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Supplier;
 
 public class E32LoRaMeshClient implements LoRaMeshClient {
-
     public static final Path outFilePath = Config.fsRoot.resolve("out.txt");
+
+    public static final long COOLDOWN = 1000;
 
     public static final String startingSymbol = "x";
     public static final String terminalSymbol = ";";
 
     private final Queue<SendingItem> queue = new LinkedList<>();
-    private final FileClient fileClient;
-    private final BashClient bashClient;
-    private final Logger logger;
+    private FileClient fs;
+    private CommandLine cmd;
+    private Logger logger;
+    private Executor exec;
 
     private ChannelInfo listeningChannel = null;
     private Observer<Message> listeningObserver = null;
-    private Supplier<NodeInfo> listeningNodeInfoSupplier = null;
     private Process listeningProcess = null;
     private Scanner listeningScanner = null;
+    private long lastSendingTime;
 
-    public E32LoRaMeshClient(FileClient fileClient, BashClient bashClient, Logger logger) {
-        this.fileClient = fileClient;
-        this.bashClient = bashClient;
-        this.logger = logger;
-        Exec.repeat(this::tick, getSendingIntervalMillis());
+    @Override
+    public void deploy() {
+        lastSendingTime = System.currentTimeMillis();
+        exec.scheduleDynamic("tick", this::tick, () -> lastSendingTime + COOLDOWN, () -> false);
+    }
+
+    @Override
+    public void useContext(ApplicationContext ctx) {
+        logger = ctx.resolve(Logger.class);
+        cmd = ctx.resolve(CommandLine.class);
+        fs = ctx.resolve(FileClient.class);
+        exec = ctx.resolve(Executor.class);
     }
 
     private void tick() {
@@ -50,46 +53,46 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
             var startIndex = in.indexOf(startingSymbol) + startingSymbol.length();
             var endIndex =  in.indexOf(terminalSymbol);
             if (startIndex > 0) {
-                logger.debug("received (garbage/discarding): " + in.substring(0, startIndex), listeningNodeInfoSupplier.get());
+                logger.debug("received (garbage/discarding): " + in.substring(0, startIndex), this);
             }
             var raw = in.substring(startIndex, endIndex);
             if (listeningObserver != null && !listeningObserver.isExpired()) {
-                logger.debug("received: " + in, listeningNodeInfoSupplier.get());
+                logger.debug("received: " + in, this);
                 listeningObserver.next(rawToMessage(raw));
             } else {
-                logger.debug("received (discarding): " + in, listeningNodeInfoSupplier.get());
+                logger.debug("received (discarding): " + in, this);
             }
         }
 
         if (!queue.isEmpty()) {
             var item = queue.poll();
             var raw = messageToRaw(item.message);
-            logger.debug("emitting: " + raw, listeningNodeInfoSupplier.get());
+            logger.debug("emitting: " + raw, this);
             stopListening();
             try {
-                fileClient.write(outFilePath, startingSymbol + raw + terminalSymbol);
-                bashClient.run("bash", "-l", "-c", "e32", "-w", item.channel.code, "--in-file", outFilePath.toString());
+                fs.write(outFilePath, startingSymbol + raw + terminalSymbol);
+                cmd.run("bash", "-l", "-c", "e32", "-w", item.channel.code, "--in-file", outFilePath.toString());
             } catch (Exception e) {
-                logger.error("exception thrown while trying to send message: " + e, item.nodeInfo);
+                logger.error("exception thrown while trying to send message: " + e, this);
             }
             startListening();
+            lastSendingTime = System.currentTimeMillis();
         }
     }
 
     @Override
-    public void listen(ChannelInfo channel, Observer<Message> observer, Supplier<NodeInfo> nodeInfoSupplier) {
-        logger.debug("now listening on channel " + channel.code, listeningNodeInfoSupplier.get());
+    public void listen(ChannelInfo channel, Observer<Message> observer) {
+        logger.debug("now listening on channel " + channel.code, this);
         if (listeningObserver != null) listeningObserver.dispose();
         stopListening();
         listeningChannel = channel;
         listeningObserver = observer;
-        listeningNodeInfoSupplier = nodeInfoSupplier;
         startListening();
     }
 
     private void stopListening() {
         if (listeningProcess == null || listeningScanner == null) return;
-        logger.debug("listening pause...", listeningNodeInfoSupplier.get());
+        logger.debug("listening pause...", this);
         listeningProcess.destroy();
         listeningProcess = null;
         listeningScanner.close();
@@ -97,27 +100,22 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
     }
 
     private void startListening() {
-        if (listeningChannel == null || listeningObserver == null || listeningNodeInfoSupplier == null) return;
-        logger.debug("listening continue...", listeningNodeInfoSupplier.get());
+        if (listeningChannel == null || listeningObserver == null) return;
+        logger.debug("listening continue...", this);
         try {
             listeningProcess = new ProcessBuilder()
                     .command("bash", "-l", "-c", "e32", "-w", listeningChannel.code)
                     .start();
         } catch (Exception e) {
-            logger.error("exception thrown while starting to listen: " + e, listeningNodeInfoSupplier.get());
+            logger.error("exception thrown while starting to listen: " + e, this);
         }
         listeningScanner = new Scanner(listeningProcess.getInputStream());
     }
 
     @Override
-    public void enqueue(ChannelInfo channel, Message message, NodeInfo nodeInfo) {
-        logger.debug(String.format("enqueued @%s: %s", channel.code, message), nodeInfo);
-        queue.add(new SendingItem(channel, message, nodeInfo));
-    }
-
-    @Override
-    public long getSendingIntervalMillis() {
-        return 1000; // todo
+    public void enqueue(ChannelInfo channel, Message message) {
+        logger.debug(String.format("enqueued @%s: %s", channel.code, message), this);
+        queue.add(new SendingItem(channel, message));
     }
 
 
@@ -140,19 +138,22 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
     }
 
     @Override
+    public String info() {
+        return "E32";
+    }
+
+    @Override
     public Collection<Class<? extends Module>> dependencies() {
-        return Set.of(FileClient.class, BashClient.class, Logger.class);
+        return Set.of(FileClient.class, CommandLine.class, Logger.class, Executor.class);
     }
 
     private static class SendingItem {
         public final ChannelInfo channel;
         public final Message message;
-        public final NodeInfo nodeInfo;
 
-        public SendingItem(ChannelInfo channel, Message message, NodeInfo nodeInfo) {
+        public SendingItem(ChannelInfo channel, Message message) {
             this.channel = channel;
             this.message = message;
-            this.nodeInfo = nodeInfo;
         }
     }
 }

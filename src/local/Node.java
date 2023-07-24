@@ -1,8 +1,8 @@
 package local;
 
-import model.*;
 import model.Module;
-import model.execution.EventHandler;
+import model.*;
+import model.Executor;
 import model.message.Message;
 import model.message.MessageHeader;
 import model.message.MessageType;
@@ -12,18 +12,23 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.Consumer;
 
-public class Node implements Module, Runnable {
+public class Node implements Module {
 
-    public static final int STATUS_CHECK_PERIOD = 60000;
-    public static final int HELLO_PERIOD = 19000;
-    public static final int RENDEZVOUS_PERIOD = 65000;
-    public static final int ROUTING_PERIOD = 120000;
+    public static final long STATUS_CHECK_PERIOD = 60000;
+    public static final long STATUS_CHECK_DELAY = 32000;
+    public static final long HELLO_PERIOD = 20000;
+    public static final long INVITE_RESPONSE_TIMEOUT = 40100;
+    public static final long HELLO_DELAY = 0;
+    public static final long RENDEZVOUS_PERIOD = 65000;
+    public static final long RENDEZVOUS_DELAY = 27000;
+    public static final long ROUTING_PERIOD = 120000;
+    public static final long ROUTING_DELAY = 107000;
     public static final int TRACING_VOLLEY = 10;
     public static final int JOIN_VOLLEY = 10;
+    public static final long JOIN_DELAY = 10;
 
-    private static final String TRANSMITTER_COOLDOWN_EVENT_KEY = "tc";
 
-    private final long serialId;
+    public final long serialId;
     private byte nodeId = -1;
     private NodeStatus status = NodeStatus.Down;
     boolean isController = false;
@@ -35,25 +40,38 @@ public class Node implements Module, Runnable {
     private final Map<String, Integer> joinCounter = new HashMap<>();
     private final Map<Integer, Integer> traceCounter = new HashMap<>();
 
-    private CorrespondenceClient uplink;
-    private CorrespondenceClient hello;
+    private CorrespondenceRegister uplink;
+    private CorrespondenceRegister hello;
 
     private final MessageCache cache = new MessageCache(64);
-    private final EventHandler handler = new EventHandler(this);
-    private final LoRaMeshClient meshClient;
-    private final PceClient pceClient;
-    private final DataSinkClient dataSinkClient;
     private boolean dataSinkConnected = false;
-    private final ApplicationContext ctx;
+    private Logger logger;
+    private LoRaMeshClient lora;
+    private PceClient pce;
+    private DataSinkClient dataSink;
+    private Executor exec;
+    private CommandLine cmd;
+
 
     private Consumer<Message> messageHandler;
 
-    public Node(long serialId, LoRaMeshClient meshClient, DataSinkClient dataSinkClient, PceClient pceClient, ApplicationContext ctx) {
-        this.serialId = serialId;
-        this.meshClient = meshClient;
-        this.dataSinkClient = dataSinkClient;
-        this.pceClient = pceClient;
-        this.ctx = ctx;
+    public Node(long sid) {
+        this.serialId = sid;
+    }
+
+    @Override
+    public void deploy() {
+        exec.schedule("wake up", this::wakeUp, 50);
+    }
+
+    @Override
+    public void useContext(ApplicationContext ctx) {
+        logger = ctx.resolve(Logger.class);
+        exec = ctx.resolve(Executor.class);
+        cmd = ctx.resolve(CommandLine.class);
+        lora = ctx.resolve(LoRaMeshClient.class);
+        pce = ctx.resolve(PceClient.class);
+        dataSink = ctx.resolve(DataSinkClient.class);
     }
 
     public boolean isAlive() {
@@ -63,44 +81,38 @@ public class Node implements Module, Runnable {
     public void statusCheck() {
         switch (status) {
             case Node:
-                var result = pceClient.heartbeat(info());
+                var result = pce.heartbeat(snapshot());
                 if (result != null) error("connected");
-                dataSinkConnected = dataSinkClient.heartbeat();
+                dataSinkConnected = dataSink.heartbeat();
                 break;
 
             case Controller:
-                meshChannel = pceClient.heartbeat(info());
+                meshChannel = pce.heartbeat(snapshot());
                 if (meshChannel == null) error("disconnected");
-                dataSinkConnected = dataSinkClient.heartbeat();
+                dataSinkConnected = dataSink.heartbeat();
                 break;
         }
     }
 
     public void debug(String format, Object... args) {
-        var logger = ctx.resolve(Logger.class);
-        logger.debug(String.format(format, args), info());
+        logger.debug(String.format(format, args), this);
     }
 
     public void info(String format, Object... args) {
-        var logger = ctx.resolve(Logger.class);
-        logger.info(String.format(format, args), info());
+        logger.info(String.format(format, args), this);
     }
 
     public void warn(String format, Object... args) {
-        var logger = ctx.resolve(Logger.class);
-        logger.warn(String.format(format, args), info());
+        logger.warn(String.format(format, args), this);
     }
 
     public void error(String format, Object... args) {
-        handler.abortAndReset();
         status = NodeStatus.Error;
-        var logger = ctx.resolve(Logger.class);
-        var bash = ctx.resolve(BashClient.class);
-        logger.error(String.format(format, args), info());
-        bash.run("sudo", "reboot");
+        logger.error(String.format(format, args), this);
+        cmd.run("sudo", "reboot");
     }
 
-    public void run() {
+    public void wakeUp() {
         if (isAlive()) {
             warn("wake up called on live node");
             return;
@@ -108,19 +120,13 @@ public class Node implements Module, Runnable {
             debug("launch");
         }
 
-        dataSinkConnected = dataSinkClient.heartbeat();
-        meshChannel = pceClient.heartbeat(info());
+        dataSinkConnected = dataSink.heartbeat();
+        meshChannel = pce.heartbeat(snapshot());
         if (meshChannel != null) {
             isController = true;
-            initNode(pceClient.allocateNodeId(serialId, (byte) -1, 0.0), true);
+            initNode(pce.allocateNodeId(serialId, (byte) -1, 0.0), true);
         } else {
             seek();
-        }
-    }
-
-    public void refresh() {
-        synchronized (handler) {
-            handler.notifyAll();
         }
     }
 
@@ -134,20 +140,25 @@ public class Node implements Module, Runnable {
                 || MessageType.Trace.matches(message)
                 || MessageType.Resend.matches(message)) {
             debug("sending uncached %s", message);
-            meshClient.enqueue(meshChannel, message, info());
+            lora.enqueue(meshChannel, message);
         } else if (MessageType.Data.matches(message) && dataSinkConnected) {
             info("feeding data sink: %s", message);
-            dataSinkClient.feed(message);
+            dataSink.feed(message);
         } else if (MessageType.Upwards.matches(message) && status == NodeStatus.Controller) {
             debug("feeding pce: %s", message);
-            var commands = pceClient.feed(this.serialId, message);
+            var commands = pce.feed(this.serialId, message);
             debug("pce answered: %s", commands);
             for (var command : commands) interpretCommand(command);
         } else {
             info("sending %s", message);
             cache.store(message);
-            meshClient.enqueue(meshChannel, message, info());
+            lora.enqueue(meshChannel, message);
         }
+    }
+
+    private void sendRendezvous() {
+        lora.enqueue(ChannelInfo.rendezvous,
+                new Message(0, MessageUtil.channelInfoToRendezvousData(meshChannel)));
     }
 
     private void seek() {
@@ -155,10 +166,10 @@ public class Node implements Module, Runnable {
         nodeId = -1;
         status = NodeStatus.Seeking;
 
-        meshClient.listen(ChannelInfo.rendezvous, new MessageObserver(m -> {
+        lora.listen(ChannelInfo.rendezvous, new MessageObserver(m -> {
             meshChannel = MessageUtil.rendezvousDataToChannelInfo(m.data());
             join();
-        }, () -> nodeId != -1), this::info);
+        }, () -> nodeId != -1));
     }
 
     private void join() {
@@ -166,7 +177,7 @@ public class Node implements Module, Runnable {
         nodeId = 0;
         status = NodeStatus.Joining;
 
-        hello = LocalCorrespondenceClient.from(nodeId);
+        hello = LocalCorrespondenceRegister.from(nodeId);
         var data = MessageUtil.serialIdToJoinData(serialId);
 
         messageHandler = message -> {
@@ -178,7 +189,7 @@ public class Node implements Module, Runnable {
             }
         };
 
-        meshClient.listen(meshChannel, new MessageObserver(messageHandler, this::isAlive), this::info);
+        lora.listen(meshChannel, new MessageObserver(messageHandler, this::isAlive));
 
         for (int i = 0; i < JOIN_VOLLEY; i++) {
             send(hello.packAndIncrement(MessageType.Hello, data));
@@ -188,16 +199,15 @@ public class Node implements Module, Runnable {
     private void initNode(byte assignedId, boolean controller) {
         info("init as %s %d", controller? "controller" : "node", assignedId);
         this.nodeId = assignedId;
-        hello = LocalCorrespondenceClient.from(this.nodeId);
-        uplink = LocalCorrespondenceClient.from(this.nodeId);
+        hello = LocalCorrespondenceRegister.from(this.nodeId);
+        uplink = LocalCorrespondenceRegister.from(this.nodeId);
         retxRegister = new RetxRegisterImpl();
         status = controller? NodeStatus.Controller : NodeStatus.Node;
 
-        Exec.repeat(this::statusCheck, STATUS_CHECK_PERIOD);
-        Exec.repeat(() -> send(generateHello()), HELLO_PERIOD);
-        Exec.repeat(() -> meshClient.enqueue(ChannelInfo.rendezvous,
-                new Message(0, MessageUtil.channelInfoToRendezvousData(meshChannel)), info()), RENDEZVOUS_PERIOD);
-        Exec.repeat(() -> send(generateNetworkData()), ROUTING_PERIOD);
+        exec.schedulePeriodic("node status check", this::statusCheck, STATUS_CHECK_PERIOD, STATUS_CHECK_DELAY);
+        exec.schedulePeriodic("hello emit", () -> send(generateHello()), HELLO_PERIOD, HELLO_DELAY);
+        exec.schedulePeriodic("rendezvous emit", this::sendRendezvous, RENDEZVOUS_PERIOD, RENDEZVOUS_DELAY);
+        exec.schedulePeriodic("routing emit", () -> send(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
 
         messageHandler = controller? this::handleMessageAsController : this::handleMessageAsNode;
     }
@@ -209,7 +219,7 @@ public class Node implements Module, Runnable {
             handleTrace(message);
         } else {
             debug("to api: %s", message);
-            var commands = pceClient.feed(this.serialId, message);
+            var commands = pce.feed(this.serialId, message);
             debug("api answered: %s", commands);
             for (var command : commands) interpretCommand(command);
         }
@@ -236,13 +246,12 @@ public class Node implements Module, Runnable {
             joinCounter.compute(code, (k, v) -> {
 
                 if (v == null) {
-                    handler.delayed("join " + code, () -> meshClient.getSendingIntervalMillis() * JOIN_VOLLEY * 2)
-                            .then(() -> {
+                    exec.schedule("join " + code, () -> {
                                 byte reliability = (byte) (255f * joinCounter.remove(code) / JOIN_VOLLEY);
                                 byte[] data = message.data();
                                 data[0] = reliability;
                                 send(uplink.packAndIncrement(MessageType.UpwardsJoin, data));
-                            });
+                            }, JOIN_DELAY);
                     return 1;
                 } else {
                     return v + 1;
@@ -262,8 +271,7 @@ public class Node implements Module, Runnable {
                         traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
                     } else if (restored != null) {
                         traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
-                        handler.immediate("resend " + restored)
-                                .then(() -> send(restored));
+                        exec.async("resend " + restored, () -> send(restored));
                     }
                 }
             }
@@ -299,11 +307,7 @@ public class Node implements Module, Runnable {
             routingRegistry.add(assignedId);
             routingRegistry.add((byte) (assignedId | MessageHeader.DOWNWARDS_BIT));
 
-            handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
-                    .then(() -> send(message))
-                    .labelled("invite " + assignedId)
-                    .reactEvery(HELLO_PERIOD + 1)
-                    .invalidateIf(() -> retxRegister.knows(assignedId));
+            exec.scheduleDynamic("invite " + assignedId, () -> send(message), () -> INVITE_RESPONSE_TIMEOUT, () -> retxRegister.knows(assignedId));
 
         } else if (MessageType.Downwards.matches(message) && shouldForward(message)) {
             routingRegistry.add(message.data(0));
@@ -386,8 +390,13 @@ public class Node implements Module, Runnable {
         return routingRegistry;
     }
 
-    public NodeInfo info() {
+    public NodeInfo snapshot() {
         return new NodeInfo(serialId, status, nodeId, retxMap);
+    }
+
+    @Override
+    public String info() {
+        return String.format("Node %d (%s/%d)", serialId, status, nodeId);
     }
 
     private void updateRouting(byte[] data) {
@@ -412,26 +421,21 @@ public class Node implements Module, Runnable {
                 for (char c : parts[3].toCharArray()) {
                     data[i++] = (byte) c;
                 }
-                Message message = pceClient.correspondence(targetId).pack(MessageType.DownwardsJoin, data);
+                Message message = pce.correspondence(targetId).pack(MessageType.DownwardsJoin, data);
 
                 if (targetId == this.nodeId) {
-
-                    handler.when(TRANSMITTER_COOLDOWN_EVENT_KEY)
-                            .then(() -> send(message))
-                            .labelled(command)
-                            .invalidateAfter(JOIN_VOLLEY);
+                    for (int j = 0; j < JOIN_VOLLEY; j++) {
+                        send(message);
+                    }
                 } else {
-                    handler.immediate(command)
-                            .then(() -> send(message));
+                    exec.async(command, () -> send(message));
                 }
             }
                 break;
             case "trace": {
                 byte[] data = new byte[parts.length - 2];
                 for (int i = 1; i < data.length; i++) data[i] = Byte.parseByte(parts[i + 2]);
-                handler.immediate(command)
-                        .then(() -> send(pceClient.correspondence(targetId).pack(MessageType.Trace, data)))
-                        .labelled(command);
+                exec.async(command, () -> send(pce.correspondence(targetId).pack(MessageType.Trace, data)));
             }
                 break;
             case "update": {
@@ -440,9 +444,7 @@ public class Node implements Module, Runnable {
                 if (targetId == this.nodeId) {
                     updateRouting(data);
                 } else {
-                    handler.immediate(command)
-                            .then(() -> send(pceClient.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)))
-                            .labelled(command);
+                    exec.async(command, () -> send(pce.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)));
                 }
             }
                 break;
@@ -453,7 +455,7 @@ public class Node implements Module, Runnable {
 
     @Override
     public Collection<Class<? extends Module>> dependencies() {
-        return Set.of(Logger.class, BashClient.class, DataSinkClient.class, PceClient.class, LoRaMeshClient.class);
+        return Set.of(Logger.class, CommandLine.class, DataSinkClient.class, PceClient.class, LoRaMeshClient.class);
     }
 
     @Override

@@ -1,31 +1,42 @@
 package production;
 
-import model.LogEntry;
-import model.Logger;
-import model.NodeInfo;
+import local.Node;
+import model.Module;
+import model.*;
 
-import java.util.function.Supplier;
+import java.util.Collection;
+import java.util.Set;
 
 public class HttpLogger implements Logger {
 
-    private final HttpRequestClient httpRequestClient;
-    private final Supplier<Logger> backupLogger;
+    private Http http;
+    private Node node;
 
-    public HttpLogger(HttpRequestClient httpRequestClient, Supplier<Logger> backupLogger) {
-        this.httpRequestClient = httpRequestClient;
-        this.backupLogger = backupLogger;
+    @Override
+    public void useContext(ApplicationContext ctx) {
+        http = ctx.resolve(Http.class);
+        node = ctx.resolve(Node.class);
     }
 
     @Override
-    public void log(Severity severity, String text, NodeInfo nodeInfo) {
+    public void log(Severity severity, String text, Module module) {
         var data = new LogEntry();
         data.severity = severity;
-        data.nodeInfo = nodeInfo;
-        data.data = text.getBytes();
+        data.moduleInfo = module.info();
+        data.data = String.format("%s:\n%s", module.info(), text).getBytes();
         try {
-            httpRequestClient.postResponseVoid("/log", JsonUtil.logEntry(data));
-        } catch (Exception e) {
-            backupLogger.get().log(severity, text, nodeInfo);
+            http.postResponseVoid(String.format("/log/%d", node.serialId), JsonUtil.logEntry(data));
+        } catch (Exception ignored) {
         }
+    }
+
+    @Override
+    public Collection<Class<? extends Module>> dependencies() {
+        return Set.of(Http.class, Node.class);
+    }
+
+    @Override
+    public String info() {
+        return "Http Logger";
     }
 }

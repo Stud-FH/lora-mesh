@@ -1,26 +1,31 @@
 package production;
 
+import model.ApplicationContext;
 import model.Logger;
-import model.NodeInfo;
+import model.Module;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.function.Supplier;
+import java.util.Collection;
+import java.util.Set;
 
-public class HttpRequestClient {
+public class Http implements Module {
 
-    private static final HttpClient http = HttpClient.newHttpClient();
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     private final URI baseUri;
-    private final Logger logger;
-    private final Supplier<NodeInfo> nodeInfo;
 
-    public HttpRequestClient(URI baseUri, Logger logger, Supplier<NodeInfo> nodeInfo) {
+    private Logger logger;
+
+    public Http(URI baseUri) {
         this.baseUri = baseUri;
-        this.logger = logger;
-        this.nodeInfo = nodeInfo;
+    }
+
+    @Override
+    public void useContext(ApplicationContext ctx) {
+        this.logger = ctx.resolve(Logger.class);
     }
 
     public byte[] getResponseBinary(String path) {
@@ -29,11 +34,11 @@ public class HttpRequestClient {
             var request = HttpRequest.newBuilder(uri)
                     .GET()
                     .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.error("error sending request: GET " + uri, nodeInfo.get());
+            logger.error("error sending request: GET " + uri, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -44,11 +49,11 @@ public class HttpRequestClient {
             var request = HttpRequest.newBuilder(uri)
                     .GET()
                     .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.error("error sending request: GET " + uri, nodeInfo.get());
+            logger.error("error sending request: GET " + uri, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -59,11 +64,11 @@ public class HttpRequestClient {
             var request = HttpRequest.newBuilder(uri)
                     .GET()
                     .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.debug("error sending request: GET " + uri, nodeInfo.get());
+            logger.debug("error sending request: GET " + uri, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -75,10 +80,10 @@ public class HttpRequestClient {
                     .POST(HttpRequest.BodyPublishers.ofString(data))
                     .setHeader("Content-Type", "application/json")
                     .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.discarding());
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() != 200) throw new Exception(response.toString());
         } catch (Exception e) {
-            logger.error("error sending request: POST " + uri, nodeInfo.get());
+            logger.error("error sending request: POST " + uri, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -90,10 +95,10 @@ public class HttpRequestClient {
                     .POST(HttpRequest.BodyPublishers.ofByteArray(data))
                     .setHeader("Content-Type", "application/octet-stream")
                     .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.discarding());
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() != 200) throw new Exception(response.toString());
         } catch (Exception e) {
-            logger.error("error sending request: POST " + uri, nodeInfo.get());
+            logger.error("error sending request: POST " + uri, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -105,11 +110,11 @@ public class HttpRequestClient {
                     .POST(HttpRequest.BodyPublishers.ofByteArray(data))
                     .setHeader("Content-Type", "application/octet-stream")
                     .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.error("error sending request: POST " + uri, nodeInfo.get());
+            logger.error("error sending request: POST " + uri, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -121,11 +126,11 @@ public class HttpRequestClient {
                     .POST(HttpRequest.BodyPublishers.ofString(data))
                     .setHeader("Content-Type", "application/json")
                     .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.error("error sending request: POST " + uri, nodeInfo.get());
+            logger.error("error sending request: POST " + uri, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -137,12 +142,27 @@ public class HttpRequestClient {
                     .POST(HttpRequest.BodyPublishers.ofString(data))
                     .setHeader("Content-Type", "application/json")
                     .build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.debug("error sending request: POST " + uri, nodeInfo.get());
+            logger.debug("error sending request: POST " + uri, this);
             throw new RuntimeException("request failed");
         }
+    }
+
+    @Override
+    public String info() {
+        return String.format("Http @ %s", baseUri);
+    }
+
+    @Override
+    public Collection<Class<? extends Module>> dependencies() {
+        return Set.of(Logger.class);
+    }
+
+    @Override
+    public Collection<Class<? extends Module>> providers() {
+        return Set.of(Http.class);
     }
 }

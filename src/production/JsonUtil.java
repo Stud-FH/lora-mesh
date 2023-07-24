@@ -1,8 +1,8 @@
 package production;
 
 import model.LogEntry;
-import model.message.Message;
 import model.NodeInfo;
+import model.message.Message;
 
 import java.util.Map;
 
@@ -32,7 +32,7 @@ public class JsonUtil {
         StringBuilder sb = new StringBuilder();
         sb.append("{")
                 .append(key("severity")).append(string(data.severity)).append(", ")
-                .append(key("nodeInfo")).append(nodeInfo(data.nodeInfo)).append(", ")
+                .append(key("moduleInfo")).append(string(data.moduleInfo)).append(", ")
                 .append(key("data")).append(bytes(data.data))
                 .append("}");
         return sb.toString();

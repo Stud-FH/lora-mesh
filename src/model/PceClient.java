@@ -10,7 +10,7 @@ public interface PceClient extends Module {
 
     ChannelInfo heartbeat(NodeInfo nodeInfo);
     byte allocateNodeId(long serialId, byte mediatorId, double mediatorRetx);
-    CorrespondenceClient correspondence(byte nodeId);
+    CorrespondenceRegister correspondence(byte nodeId);
     List<String> feed(long controllerId, Message message);
 
     @Override

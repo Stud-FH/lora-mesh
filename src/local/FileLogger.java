@@ -1,31 +1,41 @@
 package local;
 
+import model.ApplicationContext;
 import model.Logger;
-import model.NodeInfo;
+import model.Module;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Collection;
 import java.util.Date;
-import java.util.function.Supplier;
+import java.util.Set;
 
 public class FileLogger implements Logger {
     private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss.SSSS_Z:");
 
-    private final FileClient fileClient;
-    private final Supplier<Logger> backupLogger;
+    private FileClient fs;
 
-    public FileLogger(FileClient fileClient, Supplier<Logger> backupLogger) {
-        this.fileClient = fileClient;
-        this.backupLogger = backupLogger;
+    @Override
+    public void useContext(ApplicationContext ctx) {
+        this.fs = ctx.resolve(FileClient.class);
     }
 
     @Override
-    public void log(Severity severity, String text, NodeInfo nodeInfo) {
+    public Collection<Class<? extends Module>> dependencies() {
+        return Set.of(FileClient.class);
+    }
+
+    @Override
+    public void log(Severity severity, String text, Module module) {
         String path = String.format("log/%s-%s.txt", df.format(new Date()), severity);
         try {
-            fileClient.write(path, String.format("%s\n%s", nodeInfo, text));
-        } catch (Exception e) {
-            backupLogger.get().log(severity, text, nodeInfo);
+            fs.write(path, String.format("%s:\n%s", module.info(), text));
+        } catch (Exception ignored) {
         }
+    }
+
+    @Override
+    public String info() {
+        return String.format("File Logger @ %s", fs.cwd);
     }
 }

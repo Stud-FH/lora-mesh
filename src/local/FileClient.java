@@ -3,7 +3,6 @@ package local;
 import model.ApplicationContext;
 import model.Logger;
 import model.Module;
-import production.Config;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,10 +14,21 @@ import java.util.concurrent.TimeUnit;
 
 public class FileClient implements Module {
 
-    private final ApplicationContext ctx;
+    public final Path cwd;
+    private Logger logger;
 
-    public FileClient(ApplicationContext ctx) {
-        this.ctx = ctx;
+    public FileClient(Path cwd) {
+        this.cwd = cwd;
+    }
+
+    @Override
+    public String info() {
+        return String.format("File Client @ %s", cwd);
+    }
+
+    @Override
+    public void useContext(ApplicationContext ctx) {
+        this.logger = ctx.resolve(Logger.class);
     }
 
     public void write(Path path, String text) {
@@ -30,46 +40,40 @@ public class FileClient implements Module {
     }
 
     public void write(String path, byte[] data) {
-        write(Config.fsRoot.resolve(path), data);
+        write(cwd.resolve(path), data);
     }
 
     public void write(Path path, byte[] data) {
         try {
             Files.write(path, data);
         } catch (Exception e) {
-            var logger = ctx.resolve(Logger.class);
-            var node = ctx.resolve(Node.class);
-            logger.error("error writing file: " + e, node.info());
+            logger.error("error writing file: " + e, this);
             throw new RuntimeException("file writing failed");
         }
     }
 
     public List<String> readAllLines(String filename) {
         try {
-            return Files.readAllLines(Config.fsRoot.resolve(filename));
+            return Files.readAllLines(cwd.resolve(filename));
         } catch (Exception e) {
-            var logger = ctx.resolve(Logger.class);
-            var node = ctx.resolve(Node.class);
-            logger.error("error reading file: " + e, node.info());
+            logger.error("error reading file: " + e, this);
             throw new RuntimeException("file reading failed");
         }
     }
 
     public long lastModified(String path) {
         try {
-            BasicFileAttributes attr = Files.readAttributes(Config.fsRoot.resolve(path), BasicFileAttributes.class);
+            BasicFileAttributes attr = Files.readAttributes(cwd.resolve(path), BasicFileAttributes.class);
             return attr.lastModifiedTime().to(TimeUnit.MILLISECONDS);
         } catch (Exception e) {
-            var logger = ctx.resolve(Logger.class);
-            var node = ctx.resolve(Node.class);
-            logger.error("error reading file attributes: " + e, node.info());
+            logger.error("error reading file attributes: " + e, this);
             throw new RuntimeException("file attrib reading failed");
         }
     }
 
     @Override
     public Collection<Class<? extends Module>> dependencies() {
-        return Set.of(Logger.class, Node.class);
+        return Set.of(Logger.class);
     }
 
     @Override

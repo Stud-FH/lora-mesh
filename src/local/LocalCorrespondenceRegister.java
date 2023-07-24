@@ -1,6 +1,6 @@
 package local;
 
-import model.CorrespondenceClient;
+import model.CorrespondenceRegister;
 import model.message.Message;
 import model.message.MessageHeader;
 import model.message.MessageType;
@@ -8,14 +8,14 @@ import model.message.MessageType;
 import java.util.HashSet;
 import java.util.Set;
 
-public class LocalCorrespondenceClient implements CorrespondenceClient {
+public class LocalCorrespondenceRegister implements CorrespondenceRegister {
 
-    public static LocalCorrespondenceClient to(int nodeId) {
-        return new LocalCorrespondenceClient(nodeId | MessageHeader.DOWNWARDS_BIT);
+    public static LocalCorrespondenceRegister to(int nodeId) {
+        return new LocalCorrespondenceRegister(nodeId | MessageHeader.DOWNWARDS_BIT);
     }
 
-    public static LocalCorrespondenceClient from(int nodeId) {
-        return new LocalCorrespondenceClient(nodeId);
+    public static LocalCorrespondenceRegister from(int nodeId) {
+        return new LocalCorrespondenceRegister(nodeId);
     }
 
     private static final int counterLimit = 1 << MessageHeader.COUNTER_BITS;
@@ -26,7 +26,7 @@ public class LocalCorrespondenceClient implements CorrespondenceClient {
 
     private final int address;
 
-    private LocalCorrespondenceClient(int address) {
+    private LocalCorrespondenceRegister(int address) {
         this.address = address;
     }
 

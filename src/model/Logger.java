@@ -12,22 +12,22 @@ public interface Logger extends Module {
         Error
     }
 
-    void log(Severity severity, String text, NodeInfo nodeInfo);
+    void log(Severity severity, String text, Module module);
 
-    default void debug(String text, NodeInfo nodeInfo) {
-        log(Severity.Debug, text, nodeInfo);
+    default void debug(String text, Module module) {
+        log(Severity.Debug, text, module);
     }
 
-    default void info(String text, NodeInfo nodeInfo) {
-        log(Severity.Info, text, nodeInfo);
+    default void info(String text, Module module) {
+        log(Severity.Info, text, module);
     }
 
-    default void warn(String text, NodeInfo nodeInfo) {
-        log(Severity.Warn, text, nodeInfo);
+    default void warn(String text, Module module) {
+        log(Severity.Warn, text, module);
     }
 
-    default void error(String text, NodeInfo nodeInfo) {
-        log(Severity.Error, text, nodeInfo);
+    default void error(String text, Module module) {
+        log(Severity.Error, text, module);
     }
 
     @Override

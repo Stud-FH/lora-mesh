@@ -7,12 +7,18 @@ import model.Module;
 import java.util.Collection;
 import java.util.Set;
 
-public class BashClient implements Module {
+public class CommandLine implements Module {
 
-    private final ApplicationContext ctx;
+    private Logger logger;
 
-    public BashClient(ApplicationContext ctx) {
-        this.ctx = ctx;
+    @Override
+    public String info() {
+        return "Command Line";
+    }
+
+    @Override
+    public void useContext(ApplicationContext ctx) {
+        this.logger = ctx.resolve(Logger.class);
     }
 
     public byte[] run(String... command) {
@@ -22,20 +28,18 @@ public class BashClient implements Module {
             proc.destroy();
             return result;
         } catch (Exception e) {
-            var logger = ctx.resolve(Logger.class);
-            var node = ctx.resolve(Node.class);
-            logger.error(String.format("failed running %s: %s", String.join(" ", command), e.getMessage()), node.info());
+            logger.error(String.format("failed running %s: %s", String.join(" ", command), e.getMessage()), this);
             throw new RuntimeException("command failed");
         }
     }
 
     @Override
     public Collection<Class<? extends Module>> dependencies() {
-        return Set.of(Logger.class, Node.class);
+        return Set.of(Logger.class);
     }
 
     @Override
     public Collection<Class<? extends Module>> providers() {
-        return Set.of(BashClient.class);
+        return Set.of(CommandLine.class);
     }
 }
