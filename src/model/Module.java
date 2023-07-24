@@ -11,4 +11,8 @@ public interface Module {
     default void deploy() {
 
     }
+
+    default void destroy() {
+
+    }
 }

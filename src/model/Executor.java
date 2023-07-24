@@ -14,25 +14,25 @@ public class Executor implements Module {
     private long now;
 
 
-    public void async(String desc, Runnable task) {
+    public synchronized void async(String desc, Runnable task) {
         var item = new ExecutionItem(wrap(desc, task), System.currentTimeMillis());
         items.add(item);
         item.subscribe(Runnable::run);
     }
 
-    public void schedule(String desc, Runnable task, long delay) {
+    public synchronized void schedule(String desc, Runnable task, long delay) {
         var item = new ExecutionItem(wrap(desc, task), System.currentTimeMillis() + delay);
         items.add(item);
         item.subscribe(Runnable::run);
     }
 
-    public void schedulePeriodic(String desc, Runnable task, long period, long delay) {
+    public synchronized void schedulePeriodic(String desc, Runnable task, long period, long delay) {
         var item = new PeriodicExecutionItem(wrap(desc, task), System.currentTimeMillis() + delay, period);
         items.add(item);
         item.subscribe(Runnable::run);
     }
 
-    public void scheduleDynamic(String desc, Runnable task, Supplier<Long> targetTime, Supplier<Boolean> done) {
+    public synchronized void scheduleDynamic(String desc, Runnable task, Supplier<Long> targetTime, Supplier<Boolean> done) {
         var item = new DynamicExecutionItem(wrap(desc, task), targetTime, done);
         items.add(item);
         item.subscribe(Runnable::run);
@@ -41,13 +41,15 @@ public class Executor implements Module {
     private Runnable wrap(String desc, Runnable task) {
         return () -> {
             try {
+                logger.debug(String.format("triggering task \"%s\"", desc), this);
                 task.run();
             } catch (Exception e) {
-                logger.warn(String.format("Uncaught Exception by task \"%s\": %s", desc, e.getMessage()), this);
+                logger.warn(String.format("Uncaught Exception by task \"%s\": %s at %s", desc, e, e.getStackTrace()[0]), this);
             }
         };
     }
 
+    @SuppressWarnings("BusyWait")
     private void loop() {
         while (true) {
             Collection<ExecutionItem> copy;
@@ -57,6 +59,18 @@ public class Executor implements Module {
             }
             now = System.currentTimeMillis();
             copy.stream().filter(ExecutionItem::ready).forEach(ExecutionItem::trigger);
+
+            long targetTime = copy.stream().mapToLong(item -> item.targetTime).min().orElseGet(() -> System.currentTimeMillis() + 50);
+            long diff = targetTime - System.currentTimeMillis();
+            if (diff > 0) {
+                synchronized (this) {
+                    try {
+                        Thread.sleep(diff);
+                    } catch (InterruptedException e) {
+                        logger.warn("sleep interrupted!", this);
+                    }
+                }
+            }
         }
     }
 
@@ -122,14 +136,14 @@ public class Executor implements Module {
         final Supplier<Boolean> doneSupplier;
 
         public DynamicExecutionItem(Runnable task, Supplier<Long> targetTimeSupplier, Supplier<Boolean> doneSupplier) {
-            super(task, targetTimeSupplier.get());
+            super(task, Long.MAX_VALUE);
             this.targetTimeSupplier = targetTimeSupplier;
             this.doneSupplier = doneSupplier;
         }
 
-        void trigger() {
-            next(task);
-            targetTime += targetTimeSupplier.get();
+        @Override
+        boolean ready() {
+            return targetTimeSupplier.get() <= now;
         }
 
         @Override

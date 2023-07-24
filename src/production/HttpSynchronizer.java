@@ -27,7 +27,7 @@ public class HttpSynchronizer implements Module {
     @Override
     public void deploy() {
         exec.schedulePeriodic("jar sync", this::jarSync, 300000, 0);
-        exec.schedulePeriodic("status sync", this::statusSync, 300000, 50);
+        exec.schedulePeriodic("status sync", this::statusSync, 300000, 25);
     }
 
     public void statusSync() {

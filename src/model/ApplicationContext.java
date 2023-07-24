@@ -20,6 +20,10 @@ public class ApplicationContext {
         return this;
     }
 
+    public void destroy() {
+        modules.forEach(Module::destroy);
+    }
+
     @SuppressWarnings("unchecked")
     public <T extends Module> T resolve(Class<T> moduleClass) {
         return (T) registry.get(moduleClass);

@@ -51,6 +51,7 @@ public class Node implements Module {
     private DataSinkClient dataSink;
     private Executor exec;
     private CommandLine cmd;
+    private Runnable destroyCtx;
 
 
     private Consumer<Message> messageHandler;
@@ -72,6 +73,7 @@ public class Node implements Module {
         lora = ctx.resolve(LoRaMeshClient.class);
         pce = ctx.resolve(PceClient.class);
         dataSink = ctx.resolve(DataSinkClient.class);
+        destroyCtx = ctx::destroy;
     }
 
     public boolean isAlive() {
@@ -109,6 +111,7 @@ public class Node implements Module {
     public void error(String format, Object... args) {
         status = NodeStatus.Error;
         logger.error(String.format(format, args), this);
+        destroyCtx.run();
         cmd.run("sudo", "reboot");
     }
 
@@ -375,7 +378,11 @@ public class Node implements Module {
     }
 
     public void feedData(byte... data) {
-        send(uplink.packAndIncrement(MessageType.Data, data));
+        try {
+            send(uplink.packAndIncrement(MessageType.Data, data));
+        } catch (Exception e) {
+            warn("could not send data: %s", Arrays.toString(data));
+        }
     }
 
     public byte getNodeId() {

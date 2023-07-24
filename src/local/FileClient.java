@@ -4,6 +4,9 @@ import model.ApplicationContext;
 import model.Logger;
 import model.Module;
 
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -49,6 +52,28 @@ public class FileClient implements Module {
         } catch (Exception e) {
             logger.error("error writing file: " + e, this);
             throw new RuntimeException("file writing failed");
+        }
+    }
+
+    public FileWriter open(String path) {
+        return open(cwd.resolve(path));
+    }
+
+    public FileWriter open(Path path) {
+        try {
+            return new FileWriter(path.toFile());
+        } catch (Exception e) {
+            logger.error("error opening file: " + e, this);
+            throw new RuntimeException("file opening failed");
+        }
+    }
+
+    public void close(FileWriter writer) {
+        try {
+            writer.close();
+        } catch (Exception e) {
+            logger.error("error closing file: " + e, this);
+            throw new RuntimeException(e);
         }
     }
 

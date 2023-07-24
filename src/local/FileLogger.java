@@ -4,6 +4,8 @@ import model.ApplicationContext;
 import model.Logger;
 import model.Module;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
@@ -14,10 +16,21 @@ public class FileLogger implements Logger {
     private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss.SSSS_Z:");
 
     private FileClient fs;
+    private FileWriter writer;
 
     @Override
     public void useContext(ApplicationContext ctx) {
         this.fs = ctx.resolve(FileClient.class);
+    }
+
+    @Override
+    public void deploy() {
+        writer = fs.open("log.txt");
+    }
+
+    @Override
+    public void destroy() {
+        fs.close(writer);
     }
 
     @Override
@@ -27,9 +40,8 @@ public class FileLogger implements Logger {
 
     @Override
     public void log(Severity severity, String text, Module module) {
-        String path = String.format("log/%s-%s.txt", df.format(new Date()), severity);
         try {
-            fs.write(path, String.format("%s:\n%s", module.info(), text));
+            writer.write(String.format("[%s]\t[%s] %s: %s\n", severity, df.format(new Date()), module.info(), text));
         } catch (Exception ignored) {
         }
     }

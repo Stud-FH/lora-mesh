@@ -19,6 +19,7 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
 
     public static final String startingSymbol = "x";
     public static final String terminalSymbol = ";";
+    public static final String messagePattern = "\\w*" + startingSymbol + "\\w*" + terminalSymbol;
 
     private final Queue<SendingItem> queue = new LinkedList<>();
     private FileClient fs;
@@ -29,13 +30,12 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
     private ChannelInfo listeningChannel = null;
     private Observer<Message> listeningObserver = null;
     private Process listeningProcess = null;
-    private Scanner listeningScanner = null;
     private long lastSendingTime;
 
     @Override
     public void deploy() {
         lastSendingTime = System.currentTimeMillis();
-        exec.scheduleDynamic("tick", this::tick, () -> lastSendingTime + COOLDOWN, () -> false);
+        exec.scheduleDynamic("lora cycle", this::cycle, () -> lastSendingTime + COOLDOWN, () -> false);
     }
 
     @Override
@@ -46,21 +46,26 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
         exec = ctx.resolve(Executor.class);
     }
 
-    private void tick() {
+    private void cycle() {
 
-        while (listeningScanner != null && listeningScanner.hasNext("\\w*" + startingSymbol + "\\w*" + terminalSymbol)) {
-            var in = listeningScanner.next("\\w*" + startingSymbol + "\\w*" + terminalSymbol);
-            var startIndex = in.indexOf(startingSymbol) + startingSymbol.length();
-            var endIndex =  in.indexOf(terminalSymbol);
-            if (startIndex > 0) {
-                logger.debug("received (garbage/discarding): " + in.substring(0, startIndex), this);
+        if (listeningProcess != null && listeningObserver != null && !listeningObserver.isExpired()) {
+            String readable = "";
+            try {
+                readable = new String(listeningProcess.getInputStream().readAllBytes());
+            } catch (Exception e) {
+                logger.warn("could not read from input stream", this);
             }
-            var raw = in.substring(startIndex, endIndex);
-            if (listeningObserver != null && !listeningObserver.isExpired()) {
-                logger.debug("received: " + in, this);
+            Scanner sc = new Scanner(readable);
+            while (sc.hasNext(messagePattern)) {
+                String in = sc.next(messagePattern);
+                var startIndex = in.indexOf(startingSymbol) + startingSymbol.length();
+                var endIndex =  in.indexOf(terminalSymbol);
+                if (startIndex > 0) {
+                    logger.debug("received (prefix/discarding): " + in.substring(0, startIndex), this);
+                }
+                var raw = in.substring(startIndex, endIndex);
+                logger.debug("received: " + raw, this);
                 listeningObserver.next(rawToMessage(raw));
-            } else {
-                logger.debug("received (discarding): " + in, this);
             }
         }
 
@@ -91,12 +96,10 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
     }
 
     private void stopListening() {
-        if (listeningProcess == null || listeningScanner == null) return;
+        if (listeningProcess == null) return;
         logger.debug("listening pause...", this);
         listeningProcess.destroy();
         listeningProcess = null;
-        listeningScanner.close();
-        listeningScanner = null;
     }
 
     private void startListening() {
@@ -109,7 +112,6 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
         } catch (Exception e) {
             logger.error("exception thrown while starting to listen: " + e, this);
         }
-        listeningScanner = new Scanner(listeningProcess.getInputStream());
     }
 
     @Override
