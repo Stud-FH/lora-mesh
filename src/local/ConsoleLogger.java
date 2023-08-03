@@ -23,6 +23,11 @@ public class ConsoleLogger implements Logger {
         System.out.printf("%s%s: %s\u001B[0m\n", setColor(severity), module.info(), text);
     }
 
+    @Override
+    public void exception(Exception e, Module module) {
+        e.printStackTrace();
+    }
+
     private String setColor(Logger.Severity severity) {
         switch (severity) {
             case Debug: return "\u001B[61m";

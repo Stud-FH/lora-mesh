@@ -15,7 +15,7 @@ public class Production {
 
     public static void main(String... args) throws URISyntaxException {
 
-        System.out.println("initializing LoRa Mesh Node...");
+        System.out.println("initializing LoRa Mesh Node v3...");
 
         if (Config.missing("api")) throw new IllegalStateException("api must be specified in config.txt");
         String apiUrl = Config.var("api");
@@ -23,7 +23,7 @@ public class Production {
         boolean dataSinkDisabled = Config.var("data").equals("disabled");
         Logger.Severity logLevel = Logger.Severity.valueOf(Config.var("log", Logger.Severity.Debug.name()));
 
-        new ApplicationContext.Builder()
+        var ctx = new ApplicationContext.Builder()
                 .register(new Node(Config.serialId))
                 .register(new LogMultiplexer(new ConsoleLogger(() -> logLevel), new FileLogger(), new HttpLogger()))
                 .register(new CommandLine())
@@ -37,5 +37,7 @@ public class Production {
                 .register(new Executor())
                 .build()
                 .deploy();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(ctx::destroy));
     }
 }

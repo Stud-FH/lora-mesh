@@ -61,11 +61,6 @@ public class Node implements Module {
     }
 
     @Override
-    public void deploy() {
-        exec.schedule("wake up", this::wakeUp, 50);
-    }
-
-    @Override
     public void useContext(ApplicationContext ctx) {
         logger = ctx.resolve(Logger.class);
         exec = ctx.resolve(Executor.class);
@@ -74,6 +69,16 @@ public class Node implements Module {
         pce = ctx.resolve(PceClient.class);
         dataSink = ctx.resolve(DataSinkClient.class);
         destroyCtx = ctx::destroy;
+    }
+
+    @Override
+    public void deploy() {
+        exec.schedule(this::wakeUp, 50);
+    }
+
+    @Override
+    public void destroy() {
+        info("shutting down");
     }
 
     public boolean isAlive() {
@@ -112,7 +117,7 @@ public class Node implements Module {
         status = NodeStatus.Error;
         logger.error(String.format(format, args), this);
         destroyCtx.run();
-        cmd.run("sudo", "reboot");
+        cmd.sync("sudo", "reboot");
     }
 
     public void wakeUp() {
@@ -207,10 +212,10 @@ public class Node implements Module {
         retxRegister = new RetxRegisterImpl();
         status = controller? NodeStatus.Controller : NodeStatus.Node;
 
-        exec.schedulePeriodic("node status check", this::statusCheck, STATUS_CHECK_PERIOD, STATUS_CHECK_DELAY);
-        exec.schedulePeriodic("hello emit", () -> send(generateHello()), HELLO_PERIOD, HELLO_DELAY);
-        exec.schedulePeriodic("rendezvous emit", this::sendRendezvous, RENDEZVOUS_PERIOD, RENDEZVOUS_DELAY);
-        exec.schedulePeriodic("routing emit", () -> send(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
+        exec.schedulePeriodic(this::statusCheck, STATUS_CHECK_PERIOD, STATUS_CHECK_DELAY);
+        exec.schedulePeriodic(() -> send(generateHello()), HELLO_PERIOD, HELLO_DELAY);
+        exec.schedulePeriodic(this::sendRendezvous, RENDEZVOUS_PERIOD, RENDEZVOUS_DELAY);
+        exec.schedulePeriodic(() -> send(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
 
         messageHandler = controller? this::handleMessageAsController : this::handleMessageAsNode;
     }
@@ -249,7 +254,7 @@ public class Node implements Module {
             joinCounter.compute(code, (k, v) -> {
 
                 if (v == null) {
-                    exec.schedule("join " + code, () -> {
+                    exec.schedule(() -> {
                                 byte reliability = (byte) (255f * joinCounter.remove(code) / JOIN_VOLLEY);
                                 byte[] data = message.data();
                                 data[0] = reliability;
@@ -274,7 +279,7 @@ public class Node implements Module {
                         traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
                     } else if (restored != null) {
                         traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
-                        exec.async("resend " + restored, () -> send(restored));
+                        exec.async(() -> send(restored));
                     }
                 }
             }
@@ -310,7 +315,7 @@ public class Node implements Module {
             routingRegistry.add(assignedId);
             routingRegistry.add((byte) (assignedId | MessageHeader.DOWNWARDS_BIT));
 
-            exec.scheduleDynamic("invite " + assignedId, () -> send(message), () -> INVITE_RESPONSE_TIMEOUT, () -> retxRegister.knows(assignedId));
+            exec.async(() -> this.invite(assignedId, message));
 
         } else if (MessageType.Downwards.matches(message) && shouldForward(message)) {
             routingRegistry.add(message.data(0));
@@ -321,6 +326,12 @@ public class Node implements Module {
         }
     }
 
+    private void invite(byte assignedId, Message message) {
+        if (!retxRegister.knows(assignedId)) {
+            send(message);
+            exec.schedule(() -> this.invite(assignedId, message), INVITE_RESPONSE_TIMEOUT);
+        }
+    }
     private void handleRouting(Message message) {
         debug("received routing: %s", message);
         if (MessageType.Downwards.matches(message) && message.getNodeId() == nodeId) {
@@ -378,10 +389,14 @@ public class Node implements Module {
     }
 
     public void feedData(byte... data) {
+        if (uplink == null) {
+            warn("data loss in status %s: %s", status, Arrays.toString(data));
+            return;
+        }
         try {
             send(uplink.packAndIncrement(MessageType.Data, data));
         } catch (Exception e) {
-            warn("could not send data: %s", Arrays.toString(data));
+            logger.exception(e, this);
         }
     }
 
@@ -435,14 +450,14 @@ public class Node implements Module {
                         send(message);
                     }
                 } else {
-                    exec.async(command, () -> send(message));
+                    exec.async(() -> send(message));
                 }
             }
                 break;
             case "trace": {
                 byte[] data = new byte[parts.length - 2];
                 for (int i = 1; i < data.length; i++) data[i] = Byte.parseByte(parts[i + 2]);
-                exec.async(command, () -> send(pce.correspondence(targetId).pack(MessageType.Trace, data)));
+                exec.async(() -> send(pce.correspondence(targetId).pack(MessageType.Trace, data)));
             }
                 break;
             case "update": {
@@ -451,7 +466,7 @@ public class Node implements Module {
                 if (targetId == this.nodeId) {
                     updateRouting(data);
                 } else {
-                    exec.async(command, () -> send(pce.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)));
+                    exec.async(() -> send(pce.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)));
                 }
             }
                 break;

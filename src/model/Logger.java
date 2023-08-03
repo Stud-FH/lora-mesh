@@ -13,6 +13,7 @@ public interface Logger extends Module {
     }
 
     void log(Severity severity, String text, Module module);
+    void exception(Exception e, Module module);
 
     default void debug(String text, Module module) {
         log(Severity.Debug, text, module);

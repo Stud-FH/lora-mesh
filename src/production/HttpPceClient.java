@@ -21,7 +21,7 @@ public class HttpPceClient implements PceClient {
     @Override
     public ChannelInfo heartbeat(NodeInfo nodeInfo) {
         try {
-            String response = ctx.resolve(Http.class).postResponseStringDebugOnly("/pce", JsonUtil.nodeInfo(nodeInfo));
+            String response = ctx.resolve(Http.class).postResponseString("/pce", JsonUtil.nodeInfo(nodeInfo));
             return new ChannelInfo(response);
         } catch (Exception e) {
             return null;

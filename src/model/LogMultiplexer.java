@@ -23,6 +23,11 @@ public class LogMultiplexer implements Logger {
     }
 
     @Override
+    public void exception(Exception e, Module module) {
+        loggers.forEach(l -> l.exception(e, module));
+    }
+
+    @Override
     public Collection<Class<? extends Module>> providers() {
         return loggers.stream().flatMap(l -> l.providers().stream()).collect(Collectors.toSet());
     }

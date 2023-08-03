@@ -4,8 +4,10 @@ import local.Node;
 import model.Module;
 import model.*;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class HttpLogger implements Logger {
 
@@ -28,6 +30,11 @@ public class HttpLogger implements Logger {
             http.postResponseVoid(String.format("/log/%d", node.serialId), JsonUtil.logEntry(data));
         } catch (Exception ignored) {
         }
+    }
+
+    @Override
+    public void exception(Exception e, Module module) {
+        warn(e.toString() + "\n" + Arrays.stream(e.getStackTrace()).map(Object::toString).collect(Collectors.joining("\n")), module);
     }
 
     @Override

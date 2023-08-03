@@ -38,7 +38,7 @@ public class Http implements Module {
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.error("error sending request: GET " + uri, this);
+            logger.exception(e, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -53,12 +53,12 @@ public class Http implements Module {
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.error("error sending request: GET " + uri, this);
+            logger.exception(e, this);
             throw new RuntimeException("request failed");
         }
     }
 
-    public String getResponseStringDebugOnly(String path) {
+    public String getResponseStringDisableLogging(String path) {
         var uri = baseUri.resolve(path);
         try {
             var request = HttpRequest.newBuilder(uri)
@@ -68,7 +68,6 @@ public class Http implements Module {
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.debug("error sending request: GET " + uri, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -83,7 +82,7 @@ public class Http implements Module {
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() != 200) throw new Exception(response.toString());
         } catch (Exception e) {
-            logger.error("error sending request: POST " + uri, this);
+            logger.exception(e, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -98,7 +97,7 @@ public class Http implements Module {
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() != 200) throw new Exception(response.toString());
         } catch (Exception e) {
-            logger.error("error sending request: POST " + uri, this);
+            logger.exception(e, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -114,7 +113,7 @@ public class Http implements Module {
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.error("error sending request: POST " + uri, this);
+            logger.exception(e, this);
             throw new RuntimeException("request failed");
         }
     }
@@ -130,23 +129,7 @@ public class Http implements Module {
             if (response.statusCode() != 200) throw new Exception(response.toString());
             return response.body();
         } catch (Exception e) {
-            logger.error("error sending request: POST " + uri, this);
-            throw new RuntimeException("request failed");
-        }
-    }
-
-    public String postResponseStringDebugOnly(String path, String data) {
-        var uri = baseUri.resolve(path);
-        try {
-            var request = HttpRequest.newBuilder(uri)
-                    .POST(HttpRequest.BodyPublishers.ofString(data))
-                    .setHeader("Content-Type", "application/json")
-                    .build();
-            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) throw new Exception(response.toString());
-            return response.body();
-        } catch (Exception e) {
-            logger.debug("error sending request: POST " + uri, this);
+            logger.exception(e, this);
             throw new RuntimeException("request failed");
         }
     }

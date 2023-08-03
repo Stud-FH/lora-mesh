@@ -24,12 +24,14 @@ public class RpiTemperatureSensor implements Module {
 
     @Override
     public void deploy() {
-        exec.schedulePeriodic("data feed", this::feedData, 10000, 3000);
+        exec.schedulePeriodic(this::feedData, 10000, 3000);
     }
 
     private void feedData() {
-        var data = cmd.run("vcgencmd", "measure_temp");
-        node.feedData(data);
+        if (node.isAlive()) {
+            var data = cmd.sync("vcgencmd", "measure_temp");
+            node.feedData(data);
+        }
     }
 
     @Override

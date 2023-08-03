@@ -4,9 +4,7 @@ import model.ApplicationContext;
 import model.Logger;
 import model.Module;
 
-import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -47,11 +45,11 @@ public class FileClient implements Module {
     }
 
     public void write(Path path, byte[] data) {
+        logger.debug(String.format("writing to file %s: %s", path, data.length > 50? String.format("(%d bytes)", data.length) : new String(data)), this);
         try {
             Files.write(path, data);
         } catch (Exception e) {
-            logger.error("error writing file: " + e, this);
-            throw new RuntimeException("file writing failed");
+            logger.exception(e, this);
         }
     }
 
@@ -60,38 +58,41 @@ public class FileClient implements Module {
     }
 
     public FileWriter open(Path path) {
+        logger.debug(String.format("opening file %s", path), this);
         try {
             return new FileWriter(path.toFile());
         } catch (Exception e) {
-            logger.error("error opening file: " + e, this);
+            logger.exception(e, this);
             throw new RuntimeException("file opening failed");
         }
     }
 
     public void close(FileWriter writer) {
+        logger.debug("closing file writer", this);
         try {
             writer.close();
         } catch (Exception e) {
-            logger.error("error closing file: " + e, this);
-            throw new RuntimeException(e);
+            logger.exception(e, this);
         }
     }
 
     public List<String> readAllLines(String filename) {
+        logger.debug(String.format("reading file %s", filename), this);
         try {
             return Files.readAllLines(cwd.resolve(filename));
         } catch (Exception e) {
-            logger.error("error reading file: " + e, this);
+            logger.exception(e, this);
             throw new RuntimeException("file reading failed");
         }
     }
 
     public long lastModified(String path) {
+        logger.debug(String.format("reading file attributes %s", path), this);
         try {
             BasicFileAttributes attr = Files.readAttributes(cwd.resolve(path), BasicFileAttributes.class);
             return attr.lastModifiedTime().to(TimeUnit.MILLISECONDS);
         } catch (Exception e) {
-            logger.error("error reading file attributes: " + e, this);
+            logger.exception(e, this);
             throw new RuntimeException("file attrib reading failed");
         }
     }

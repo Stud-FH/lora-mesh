@@ -26,12 +26,12 @@ public class HttpSynchronizer implements Module {
 
     @Override
     public void deploy() {
-        exec.schedulePeriodic("jar sync", this::jarSync, 300000, 0);
-        exec.schedulePeriodic("status sync", this::statusSync, 300000, 25);
+        exec.schedulePeriodic(this::jarSync, 300000, 0);
+        exec.schedulePeriodic(this::statusSync, 300000, 25);
     }
 
     public void statusSync() {
-        var data = bash.run("ip", "a");
+        var data = bash.sync("ip", "a");
         var response = http.postResponseBinary(String.format("/status/%d", Config.serialId), data);
         fs.write("config.txt", response);
     }

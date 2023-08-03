@@ -4,8 +4,7 @@ import model.ApplicationContext;
 import model.Logger;
 import model.Module;
 
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
@@ -46,6 +45,14 @@ public class FileLogger implements Logger {
         }
     }
 
+    @Override
+    public void exception(Exception e, Module module) {
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(); PrintStream printStream = new PrintStream(outputStream)) {
+            e.printStackTrace(printStream);
+            writer.write(outputStream.toString());
+        } catch (Exception ignored) {
+        }
+    }
     @Override
     public String info() {
         return String.format("File Logger @ %s", fs.cwd);

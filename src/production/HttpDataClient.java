@@ -19,7 +19,7 @@ public class HttpDataClient implements DataSinkClient {
 
     @Override
     public boolean heartbeat() {
-        var response = ctx.resolve(Http.class).getResponseStringDebugOnly("/data");
+        var response = ctx.resolve(Http.class).getResponseStringDisableLogging("/data");
         return "true".equals(response);
     }
 
