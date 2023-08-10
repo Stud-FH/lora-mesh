@@ -1,6 +1,6 @@
 package local;
 
-import model.ApplicationContext;
+import model.Context;
 import model.Logger;
 import model.Module;
 
@@ -28,7 +28,7 @@ public class FileClient implements Module {
     }
 
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
         this.logger = ctx.resolve(Logger.class);
     }
 
@@ -100,10 +100,5 @@ public class FileClient implements Module {
     @Override
     public Collection<Class<? extends Module>> dependencies() {
         return Set.of(Logger.class);
-    }
-
-    @Override
-    public Collection<Class<? extends Module>> providers() {
-        return Set.of(FileClient.class);
     }
 }

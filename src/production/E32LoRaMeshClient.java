@@ -8,11 +8,9 @@ import model.Executor;
 import model.message.Message;
 
 import java.nio.ByteBuffer;
-import java.nio.file.Path;
 import java.util.*;
 
 public class E32LoRaMeshClient implements LoRaMeshClient {
-    public static final Path outFilePath = Config.fsRoot.resolve("out.txt");
 
     public static final long COOLDOWN = 1000;
 
@@ -35,7 +33,7 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
     }
 
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
         logger = ctx.resolve(Logger.class);
         cmd = ctx.resolve(CommandLine.class);
         exec = ctx.resolve(Executor.class);

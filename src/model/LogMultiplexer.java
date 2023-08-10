@@ -13,8 +13,8 @@ public class LogMultiplexer implements Logger {
     }
 
     @Override
-    public void useContext(ApplicationContext ctx) {
-        loggers.forEach(l -> l.useContext(ctx));
+    public void build(Context ctx) {
+        loggers.forEach(l -> l.build(ctx));
     }
 
     @Override

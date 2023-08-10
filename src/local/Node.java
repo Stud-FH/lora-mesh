@@ -45,12 +45,12 @@ public class Node implements Module {
 
     private final MessageCache cache = new MessageCache(64);
     private boolean dataSinkConnected = false;
+    private OsAdapter os;
+    private Executor exec;
     private Logger logger;
     private LoRaMeshClient lora;
     private PceClient pce;
     private DataSinkClient dataSink;
-    private Executor exec;
-    private CommandLine cmd;
     private Runnable destroyCtx;
 
 
@@ -61,10 +61,10 @@ public class Node implements Module {
     }
 
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
+        os = ctx.resolve(OsAdapter.class);
         logger = ctx.resolve(Logger.class);
         exec = ctx.resolve(Executor.class);
-        cmd = ctx.resolve(CommandLine.class);
         lora = ctx.resolve(LoRaMeshClient.class);
         pce = ctx.resolve(PceClient.class);
         dataSink = ctx.resolve(DataSinkClient.class);
@@ -117,7 +117,7 @@ public class Node implements Module {
         status = NodeStatus.Error;
         logger.error(String.format(format, args), this);
         destroyCtx.run();
-        cmd.sync("sudo", "reboot");
+        os.reboot();
     }
 
     public void wakeUp() {
@@ -477,11 +477,6 @@ public class Node implements Module {
 
     @Override
     public Collection<Class<? extends Module>> dependencies() {
-        return Set.of(Logger.class, CommandLine.class, DataSinkClient.class, PceClient.class, LoRaMeshClient.class);
-    }
-
-    @Override
-    public Collection<Class<? extends Module>> providers() {
-        return Set.of(Node.class);
+        return Set.of(Logger.class, Executor.class, DataSinkClient.class, PceClient.class, LoRaMeshClient.class, OsAdapter.class);
     }
 }

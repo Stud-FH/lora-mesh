@@ -2,7 +2,7 @@ package production;
 
 import local.CommandLine;
 import local.FileClient;
-import model.ApplicationContext;
+import model.Context;
 import model.Module;
 import model.Executor;
 
@@ -11,13 +11,18 @@ import java.util.Set;
 
 public class HttpSynchronizer implements Module {
 
+    private final long serialId;
     private Http http;
     private FileClient fs;
     private CommandLine bash;
     private Executor exec;
 
+    public HttpSynchronizer(long serialId) {
+        this.serialId = serialId;
+    }
+
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
         http = ctx.resolve(Http.class);
         fs = ctx.resolve(FileClient.class);
         bash = ctx.resolve(CommandLine.class);
@@ -32,7 +37,7 @@ public class HttpSynchronizer implements Module {
 
     public void statusSync() {
         var data = bash.sync("ip", "a");
-        var response = http.postResponseBinary(String.format("/status/%d", Config.serialId), data);
+        var response = http.postResponseBinary(String.format("/status/%d", serialId), data);
         fs.write("config.txt", response);
     }
 
@@ -47,11 +52,6 @@ public class HttpSynchronizer implements Module {
     @Override
     public Collection<Class<? extends Module>> dependencies() {
         return Set.of(Http.class, FileClient.class, CommandLine.class);
-    }
-
-    @Override
-    public Collection<Class<? extends Module>> providers() {
-        return Set.of(HttpSynchronizer.class);
     }
 
     @Override

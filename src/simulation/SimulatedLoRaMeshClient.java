@@ -1,129 +1,80 @@
-//package simulation;
-//
-//import local.ConsoleLogger;
-//import local.Exec;
-//import model.ChannelInfo;
-//import model.LoRaMeshClient;
-//import model.Logger;
-//import model.Observer;
-//import model.message.Message;
-//import model.message.MessageType;
-//import local.Node;
-//import model.NodeInfo;
-//
-//import java.io.Serializable;
-//import java.util.*;
-//import java.util.function.Consumer;
-//import java.util.function.Supplier;
-//
-//public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
-//
-//    String name;
-//    double x, y;
-//    private boolean controller;
-//    final Map<SimulatedLoRaMeshClient, Double> reception = new HashMap<>();
-//    transient Node node;
-//    transient Consumer<Message> receiveCallback;
-//    transient SimulatedPceClient pce;
-//    transient SimulatedDataSinkClient data;
-//    transient ChannelInfo listeningChannel;
-//    transient long lastSent;
-//    transient long lastHello;
-//    Logger.Severity logLevel = Logger.Severity.Info;
-//
-//    SimulatedLoRaMeshClient(String name, double x, double y) {
-//        this.name = name;
-//        this.x = x;
-//        this.y = y;
-//    }
-//
-//    SimulatedLoRaMeshClient init(long delay) {
-//        pce = new SimulatedPceClient(this);
-//        pce.connected = controller;
-//        data = new SimulatedDataSinkClient();
-//        data.connected = controller;
-//        long serialId = UUID.nameUUIDFromBytes(name.getBytes()).getMostSignificantBits();
-//        node = new Node(
-//                serialId,
-//                this,
-//                data,
-//                pce,
-//                new ConsoleLogger(() -> logLevel));
-//        Exec.run(node, delay);
-//        return this;
-//    }
-//
-//    public double distance(double x, double y) {
-//        x -= this.x;
-//        y -= this.y;
-//        return Math.sqrt(x*x + y*y);
-//    }
-//
-//    public double reception(SimulatedLoRaMeshClient other) {
-//        return reception.getOrDefault(other, naturalReception(other));
-//    }
-//
-//    public double naturalReception(SimulatedLoRaMeshClient other) {
-//        Random pseudo = new Random((long) (x + 10*y + 100*other.x + 1000*other.y));
-//        double distance = distance(other.x, other.y);
-//        double distancePower = 0.2 * Math.pow(1.5, distance * 3);
-//        return Math.min(0.95, Math.pow(pseudo.nextDouble(), distancePower));
-//    }
-//
-//    @Override
-//    public void enqueue(ChannelInfo channel, Message message) {
-//        if (message.dataLength() > 12) node.warn("sending long message: %s", message);
-//        if (MessageType.Hello.matches(message)) {
-//            lastHello = System.currentTimeMillis();
-//        } else {
-//            lastSent = System.currentTimeMillis();
-//        }
-//        Random r = new Random();
-//        List<SimulatedLoRaMeshClient> all;
-//
-//        synchronized(Simulation.INSTANCE) {
-//            all = new ArrayList<>(Simulation.INSTANCE.all);
-//        }
-//
-//        for (SimulatedLoRaMeshClient other : all) {
-//            if (other == this || other.node == null || !other.node.isAlive() || !channel.equals(other.listeningChannel))
-//                continue;
-//
-//            if (r.nextDouble() <= other.reception(this)) {
-////                other.node.debug("receiving from %s: %s", name, message);
-//                other.receiveCallback.accept(message);
-//            }
-//        }
-//    }
-//
-//    @Override
-//    public void listen(ChannelInfo channelInfo, Observer<Message> observer) {
-//        this.listeningChannel = channelInfo;
-//        this.receiveCallback = observer::next;
-//    }
-//
-//    public void refresh() {
-//        // todo
-//        node.refresh();
-//    }
-//
-//    public boolean isController() {
-//        return controller;
-//    }
-//
-//    public void setController(boolean controller) {
-//        this.controller = controller;
-//        if (pce != null) pce.connected = controller;
-//        if (data != null) data.connected = controller;
-//    }
-//
-//    @Override
-//    public long getSendingIntervalMillis() {
-//        return Simulation.INSTANCE.pause? 100000000000L : 1000 / Simulation.INSTANCE.timeFactor;
-//    }
-//
-//    @Override
-//    public String toString() {
-//        return name + ":  \t" + node.info();
-//    }
-//}
+package simulation;
+
+import model.*;
+import model.Module;
+import model.Observer;
+import model.message.Message;
+import model.message.MessageType;
+
+import java.io.Serializable;
+import java.util.*;
+import java.util.function.Consumer;
+
+public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
+
+    private final Simulation simulation;
+    private NodeHandle handle;
+    private NodeLabel label;
+    private Logger logger;
+    private Consumer<Message> receiveCallback;
+    ChannelInfo listeningChannel;
+    long lastSent;
+    long lastHello;
+    Logger.Severity logLevel = Logger.Severity.Info;
+
+    public SimulatedLoRaMeshClient(Simulation simulation) {
+        this.simulation = simulation;
+    }
+
+    @Override
+    public void build(Context ctx) {
+        handle = ctx.resolve(NodeHandle.class);
+        label = ctx.resolve(NodeLabel.class);
+        logger = ctx.resolve(Logger.class);
+    }
+
+    @Override
+    public void enqueue(ChannelInfo channel, Message message) {
+        if (message.dataLength() > 12) logger.warn("sending long message: " + message, this);
+        if (MessageType.Hello.matches(message)) {
+            lastHello = System.currentTimeMillis();
+        } else {
+            lastSent = System.currentTimeMillis();
+        }
+        Random r = new Random();
+        List<NodeHandle> all;
+
+        synchronized(simulation) {
+            all = new ArrayList<>(simulation.all());
+        }
+
+        for (var other : all) {
+            if (other == handle || !other.isAlive() || !channel.equals(other.listeningChannel()))
+                continue;
+
+            if (r.nextDouble() <= other.reception(handle)) {
+                other.receive(message);
+            }
+        }
+    }
+
+    public void receive(Message message) {
+        receiveCallback.accept(message);
+    }
+
+    @Override
+    public void listen(ChannelInfo channelInfo, Observer<Message> observer) {
+        this.listeningChannel = channelInfo;
+        this.receiveCallback = observer::next;
+    }
+
+    @Override
+    public Collection<Class<? extends Module>> dependencies() {
+        return Set.of(NodeHandle.class, NodeLabel.class, Logger.class);
+    }
+
+    @Override
+    public String info() {
+        return label.get("LoRaSim");
+    }
+}

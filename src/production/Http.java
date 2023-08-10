@@ -1,6 +1,6 @@
 package production;
 
-import model.ApplicationContext;
+import model.Context;
 import model.Logger;
 import model.Module;
 
@@ -24,7 +24,7 @@ public class Http implements Module {
     }
 
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
         this.logger = ctx.resolve(Logger.class);
     }
 
@@ -144,8 +144,4 @@ public class Http implements Module {
         return Set.of(Logger.class);
     }
 
-    @Override
-    public Collection<Class<? extends Module>> providers() {
-        return Set.of(Http.class);
-    }
 }

@@ -1,16 +1,16 @@
 package local;
 
-import model.ApplicationContext;
+import model.Context;
 import model.Logger;
 import model.Module;
+import model.OsAdapter;
 
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
 import java.util.Collection;
 import java.util.Set;
 
 public class CommandLine implements Module {
 
+    private OsAdapter os;
     private Logger logger;
 
     @Override
@@ -19,13 +19,14 @@ public class CommandLine implements Module {
     }
 
     @Override
-    public void useContext(ApplicationContext ctx) {
-        this.logger = ctx.resolve(Logger.class);
+    public void build(Context ctx) {
+        os = ctx.resolve(OsAdapter.class);
+        logger = ctx.resolve(Logger.class);
     }
 
     @Override
     public void deploy() {
-        var pwd =new String(sync("echo","pwd"));
+        var pwd = os.pwd();
         logger.debug(String.format("pwd: %s", pwd), this);
     }
 
@@ -54,11 +55,6 @@ public class CommandLine implements Module {
 
     @Override
     public Collection<Class<? extends Module>> dependencies() {
-        return Set.of(Logger.class);
-    }
-
-    @Override
-    public Collection<Class<? extends Module>> providers() {
-        return Set.of(CommandLine.class);
+        return Set.of(OsAdapter.class, Logger.class);
     }
 }

@@ -1,6 +1,6 @@
 package production;
 
-import model.ApplicationContext;
+import model.Context;
 import model.DataSinkClient;
 import model.Module;
 import model.message.Message;
@@ -10,10 +10,10 @@ import java.util.Set;
 
 public class HttpDataClient implements DataSinkClient {
 
-    private ApplicationContext ctx;
+    private Context ctx;
 
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
         this.ctx = ctx;
     }
 

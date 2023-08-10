@@ -1,6 +1,6 @@
 package local;
 
-import model.ApplicationContext;
+import model.Context;
 import model.Logger;
 import model.Module;
 
@@ -44,7 +44,7 @@ public class ConsoleLogger implements Logger {
     }
 
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
     }
 
     @Override

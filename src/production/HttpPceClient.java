@@ -11,10 +11,10 @@ import java.util.Set;
 
 public class HttpPceClient implements PceClient {
 
-    private ApplicationContext ctx;
+    private Context ctx;
 
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
         this.ctx = ctx;
     }
 

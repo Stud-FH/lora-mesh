@@ -15,7 +15,7 @@ public class HttpLogger implements Logger {
     private Node node;
 
     @Override
-    public void useContext(ApplicationContext ctx) {
+    public void build(Context ctx) {
         http = ctx.resolve(Http.class);
         node = ctx.resolve(Node.class);
     }

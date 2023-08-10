@@ -11,6 +11,6 @@ public interface LoRaMeshClient extends Module {
 
     @Override
     default Collection<Class<? extends Module>> providers() {
-        return Set.of(LoRaMeshClient.class);
+        return Set.of(LoRaMeshClient.class, this.getClass());
     }
 }
