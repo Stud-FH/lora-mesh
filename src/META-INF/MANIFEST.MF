@@ -1,3 +1,3 @@
 Manifest-Version: 1.0
-Main-Class: production.Production
+Main-Class: v2.simulation.Simulation
 
