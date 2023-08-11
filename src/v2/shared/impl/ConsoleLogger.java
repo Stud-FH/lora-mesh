@@ -5,16 +5,16 @@ import v2.core.context.Context;
 import v2.core.context.Module;
 
 public class ConsoleLogger implements Logger {
-    private Config config;
+    private Handle handle;
 
     @Override
     public void build(Context ctx) {
-        config = ctx.resolve(Config.class);
+        handle = ctx.resolve(Handle.class);
     }
 
     @Override
     public void log(Logger.Severity severity, String text, Module module) {
-        if (severity.ordinal() < config.logLevel().ordinal()) return;
+        if (severity.ordinal() < handle.logLevel().ordinal()) return;
 //        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         System.out.printf("%s%s: %s\u001B[0m\n", setColor(severity), module.info(), text);
     }
@@ -34,7 +34,7 @@ public class ConsoleLogger implements Logger {
         }
     }
 
-    public interface Config extends Module {
+    public interface Handle extends Module {
         Logger.Severity logLevel();
     }
 }

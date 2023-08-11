@@ -5,6 +5,8 @@ import v2.core.domain.DataSinkClient;
 import v2.core.context.Context;
 import v2.core.domain.message.Message;
 
+import java.util.Collection;
+
 public class GuardedDataSinkClient implements DataSinkClient {
 
     private final DataSinkClient data;
@@ -36,9 +38,9 @@ public class GuardedDataSinkClient implements DataSinkClient {
     }
 
     @Override
-    public void feed(Message message) {
+    public Collection<Integer> feed(Message message) {
         if (handle.dataSinkDisabled()) throw new RuntimeException("invalid call of DataSinkClient.feed()");
-        data.feed(message);
+        return data.feed(message);
     }
 
     public interface Handle extends Module {

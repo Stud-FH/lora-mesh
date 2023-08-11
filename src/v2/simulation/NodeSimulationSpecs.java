@@ -10,7 +10,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class NodeSimulationSpecs implements Node.Config, ConsoleLogger.Config, GuardedDataSinkClient.Handle, GuardedPceClient.Handle, Serializable {
+public class NodeSimulationSpecs implements Node.Config, ConsoleLogger.Handle, GuardedDataSinkClient.Handle, GuardedPceClient.Handle, Serializable {
 
     private final long sid;
     private double x, y;

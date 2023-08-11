@@ -5,6 +5,8 @@ import v2.core.domain.message.Message;
 import v2.core.domain.message.MessageHeader;
 import v2.core.domain.message.MessageType;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -30,6 +32,10 @@ public class LocalCorrespondenceRegister implements CorrespondenceRegister {
         this.address = address;
     }
 
+    public int address() {
+        return address;
+    }
+
     @Override
     public Message pack(MessageType type, byte... data) {
         int header = type.getHeaderBinary()
@@ -53,23 +59,20 @@ public class LocalCorrespondenceRegister implements CorrespondenceRegister {
     /**
      * returns the list of counter numbers that were skipped when receiving this message
      */
-    public byte[] registerAndListLosses(Message message) {
+    public Collection<Integer> registerAndListLosses(Message message) {
         int counter = message.getCounter();
 
         if (counter == nextReceivingCounter) {
             nextReceivingCounter = (counter + 1) % counterLimit;
         } else if(missing.contains(counter)) {
             missing.remove(counter);
-            return new byte[] {};
+            return Collections.emptyList();
         } else {
             for (int i = nextReceivingCounter; i != counter; i = ((i + 1) % counterLimit)) {
                 missing.add(i);
             }
             nextReceivingCounter = (counter + 1) % counterLimit;
         }
-        var result = new byte[missing.size()];
-        int i = 0;
-        for (int b : missing) result[i++] = (byte) b;
-        return result;
+        return missing;
     }
 }

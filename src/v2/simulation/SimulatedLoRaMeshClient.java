@@ -68,9 +68,4 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
         this.listeningChannel = channelInfo;
         this.receiveCallback = observer::next;
     }
-
-    @Override
-    public String info() {
-        return label.get("LoRaSim");
-    }
 }

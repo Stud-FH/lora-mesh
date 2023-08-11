@@ -146,9 +146,4 @@ public class NodeHandle implements Module {
     public void kill() {
         node.error("killed");
     }
-
-    @Override
-    public String info() {
-        return "Node Handle";
-    }
 }

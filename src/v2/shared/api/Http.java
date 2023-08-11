@@ -81,6 +81,20 @@ public class Http implements Module {
         }
     }
 
+    public void postResponseVoidDisableLogging(String path, String data) {
+        var uri = config.api().resolve(path);
+        try {
+            var request = HttpRequest.newBuilder(uri)
+                    .POST(HttpRequest.BodyPublishers.ofString(data))
+                    .setHeader("Content-Type", "application/json")
+                    .build();
+            var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
+            if (response.statusCode() != 200) throw new Exception(response.toString());
+        } catch (Exception e) {
+            throw new RuntimeException("request failed");
+        }
+    }
+
     public void postResponseVoid(String path, byte[] data) {
         var uri = config.api().resolve(path);
         try {

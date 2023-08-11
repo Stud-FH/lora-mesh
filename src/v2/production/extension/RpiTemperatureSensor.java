@@ -30,9 +30,4 @@ public class RpiTemperatureSensor implements Module {
             node.feedData(data);
         }
     }
-
-    @Override
-    public String info() {
-        return "Temperature Sensor";
-    }
 }

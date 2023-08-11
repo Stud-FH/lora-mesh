@@ -141,11 +141,6 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
         return new Message(header, buffer.array());
     }
 
-    @Override
-    public String info() {
-        return "E32";
-    }
-
     private static class SendingItem {
         public final ChannelInfo channel;
         public final Message message;

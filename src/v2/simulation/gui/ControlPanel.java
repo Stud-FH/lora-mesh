@@ -85,8 +85,8 @@ public class ControlPanel extends JPanel implements Module {
         });
         panel.add(pauseButton);
 
-        var timeSlider = new JSlider(1, 100, simulation.timeFactor);
-        timeSlider.addChangeListener(c -> simulation.timeFactor = timeSlider.getValue());
+        var timeSlider = new JSlider(-3, 5, simulation.timeControl);
+        timeSlider.addChangeListener(c -> simulation.timeControl = timeSlider.getValue());
         panel.add(timeSlider);
         return panel;
     }
@@ -151,7 +151,7 @@ public class ControlPanel extends JPanel implements Module {
         kill.addActionListener(a -> simulation.getSelected().kill());
         grid.add(kill);
 
-        JButton promote = new JButton("toggle java.api");
+        JButton promote = new JButton("toggle api");
         promote.addActionListener(a -> {
             var selected = simulation.getSelected();
             selected.setPceDisabled(!selected.pceDisabled());
@@ -239,10 +239,5 @@ public class ControlPanel extends JPanel implements Module {
             data[i++] = new String[] {other.label(), send, receive};
         }
         return data;
-    }
-
-    @Override
-    public String info() {
-        return "Control Panel";
     }
 }

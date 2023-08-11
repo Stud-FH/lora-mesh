@@ -30,7 +30,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 
-public class Simulation implements ConsoleLogger.Config, FileClient.Config, VirtualTimeExecutor.Config, Http.Config, Serializable {
+public class Simulation implements ConsoleLogger.Handle, FileClient.Config, VirtualTimeExecutor.Config, Http.Config, SimulatedDataSource.Config, Serializable {
 
     public static Path root = Path.of(String.format("%s/LoraMesh/simulation", System.getenv("LOCALAPPDATA")));
     public static URI api = URI.create("http://localhost:8080");
@@ -42,7 +42,7 @@ public class Simulation implements ConsoleLogger.Config, FileClient.Config, Virt
 
     private transient NodeHandle selected;
     private transient List<Consumer<NodeHandle>> selectionListeners;
-    public int timeFactor = 100;
+    public int timeControl = 1;
     public String view = "plain";
     public Logger.Severity logLevel = Logger.Severity.Debug;
 
@@ -148,7 +148,12 @@ public class Simulation implements ConsoleLogger.Config, FileClient.Config, Virt
 
     @Override
     public double timeFactor() {
-        return 10.0 / timeFactor;
+        return Math.pow(0.5 , timeControl);
+    }
+
+    @Override
+    public long dataFeedPeriod() {
+        return 5000;
     }
 
     public static void main(String... args) throws Exception {

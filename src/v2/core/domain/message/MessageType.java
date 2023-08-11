@@ -38,6 +38,7 @@ public enum MessageType implements MessageHeader {
      * Both directions: A message got lost somewhere on its path and needs to be resent.
      */
     Trace(TYPE_MASK, TRACE_BIT),
+    Resolved(RESOLVED_BIT, RESOLVED_BIT),
 
     /**
      * Data collected from a node, sent upwards. Interpretation depends on application.
@@ -64,7 +65,11 @@ public enum MessageType implements MessageHeader {
     }
 
     public boolean matches(Message message) {
-        return (message.header() & bitmask) == binary;
+        return matches(message.header());
+    }
+
+    public boolean matches(int header) {
+        return (header & bitmask) == binary;
     }
 
     public Collection<MessageType> children() {

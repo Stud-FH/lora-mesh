@@ -10,7 +10,7 @@ public class SimulatedDataSource implements Module {
 
     private Executor exec;
     private Node node;
-    private NodeLabel label;
+    private Config config;
 
     private int counter = 0;
 
@@ -18,19 +18,22 @@ public class SimulatedDataSource implements Module {
     public void build(Context ctx) {
         exec = ctx.resolve(Executor.class);
         node = ctx.resolve(Node.class);
-        label = ctx.resolve(NodeLabel.class);
+        config = ctx.resolve(Config.class);
     }
 
     @Override
     public void deploy() {
-        // TODO parametrize
-        exec.schedulePeriodic(this::feedData, 3000, 4000);
+        exec.schedulePeriodic(this::feedData, config.dataFeedPeriod(), config.dataFeedPeriod());
     }
 
     private void feedData() {
         if (node.isAlive()) {
-            var data = String.format("%s§%d", label.get(), counter++).getBytes();
+            var data = String.format("%d§%d", node.sid(), counter++).getBytes();
             node.feedData(data);
         }
+    }
+
+    public interface Config extends Module {
+        long dataFeedPeriod();
     }
 }

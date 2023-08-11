@@ -16,11 +16,6 @@ public class LinuxAdapter implements OsAdapter {
     }
 
     @Override
-    public String info() {
-        return "Linux Adapter";
-    }
-
-    @Override
     public Path pwd() {
         return Path.of(new String(cmd.sync("echo", "pwd")));
     }

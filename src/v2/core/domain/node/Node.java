@@ -90,6 +90,7 @@ public class Node implements Module {
     }
 
     public void statusCheck() {
+        debug("status check");
         switch (status) {
             case Node:
                 var result = pce.heartbeat(snapshot());
@@ -147,7 +148,7 @@ public class Node implements Module {
                 && (MessageType.Resend.matches(message) || !cache.contains(message));
     }
 
-    private void send(Message message) {
+    private void emit(Message message) {
         if (MessageType.Hello.matches(message)
                 || MessageType.Trace.matches(message)
                 || MessageType.Resend.matches(message)) {
@@ -155,11 +156,14 @@ public class Node implements Module {
             lora.enqueue(meshChannel, message);
         } else if (MessageType.Data.matches(message) && dataSinkConnected) {
             info("feeding data sink: %s", message);
-            dataSink.feed(message);
+            var tracingHeaders = dataSink.feed(message);
+            registerTracingHeaders(tracingHeaders);
         } else if (MessageType.Upwards.matches(message) && status == NodeStatus.Controller) {
             debug("feeding pce: %s", message);
             var commands = pce.feed(sid(), message);
-            debug("pce answered: %s", commands);
+            if (commands.isEmpty()) {
+                debug("up to date");
+            }
             for (var command : commands) interpretCommand(command);
         } else {
             info("sending %s", message);
@@ -169,6 +173,7 @@ public class Node implements Module {
     }
 
     private void sendRendezvous() {
+        debug("rendezvous emit");
         lora.enqueue(ChannelInfo.rendezvous,
                 new Message(0, MessageUtil.channelInfoToRendezvousData(meshChannel)));
     }
@@ -204,7 +209,7 @@ public class Node implements Module {
         lora.listen(meshChannel, new MessageObserver(messageHandler, this::isAlive));
 
         for (int i = 0; i < JOIN_VOLLEY; i++) {
-            send(hello.packAndIncrement(MessageType.Hello, data));
+            emit(hello.packAndIncrement(MessageType.Hello, data));
         }
     }
 
@@ -217,9 +222,9 @@ public class Node implements Module {
         status = controller? NodeStatus.Controller : NodeStatus.Node;
 
         exec.schedulePeriodic(this::statusCheck, STATUS_CHECK_PERIOD, STATUS_CHECK_DELAY);
-        exec.schedulePeriodic(() -> send(generateHello()), HELLO_PERIOD, HELLO_DELAY);
+        exec.schedulePeriodic(() -> emit(generateHello()), HELLO_PERIOD, HELLO_DELAY);
         exec.schedulePeriodic(this::sendRendezvous, RENDEZVOUS_PERIOD, RENDEZVOUS_DELAY);
-        exec.schedulePeriodic(() -> send(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
+        exec.schedulePeriodic(() -> emit(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
 
         messageHandler = controller? this::handleMessageAsController : this::handleMessageAsNode;
     }
@@ -230,9 +235,8 @@ public class Node implements Module {
         } else if (MessageType.Trace.matches(message)) {
             handleTrace(message);
         } else {
-            debug("to java.api: %s", message);
+            debug("feeding api: %s", message);
             var commands = pce.feed(sid(), message);
-            debug("java.api answered: %s", commands);
             for (var command : commands) interpretCommand(command);
         }
     }
@@ -262,7 +266,7 @@ public class Node implements Module {
                                 byte reliability = (byte) (255f * joinCounter.remove(code) / JOIN_VOLLEY);
                                 byte[] data = message.data();
                                 data[0] = reliability;
-                                send(uplink.packAndIncrement(MessageType.UpwardsJoin, data));
+                                emit(uplink.packAndIncrement(MessageType.UpwardsJoin, data));
                             }, JOIN_DELAY);
                     return 1;
                 } else {
@@ -272,21 +276,7 @@ public class Node implements Module {
         } else {
             retxRegister.next(message);
 
-            if (message.hasData()) {
-                for (int i = 0; i + 1 < message.dataLength(); i += 2) {
-                    int tracingHeader = 0;
-                    tracingHeader |= message.data(i) << MessageHeader.ADDRESS_SHIFT;
-                    tracingHeader |= message.data(i + 1) << MessageHeader.COUNTER_SHIFT;
-                    traceCounter.putIfAbsent(tracingHeader, 0);
-                    Message restored = cache.restore(tracingHeader);
-                    if ((tracingHeader & MessageHeader.RESOLVED_BIT) != 0) {
-                        traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
-                    } else if (restored != null) {
-                        traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
-                        exec.async(() -> send(restored));
-                    }
-                }
-            }
+            registerTracingHeaders(MessageUtil.helloDataToTracingHeaders(message.data()));
         }
     }
 
@@ -297,7 +287,7 @@ public class Node implements Module {
         for (byte correspondenceCounter : message.data()) {
             Message restored = cache.restore(message.getTracingHeader(correspondenceCounter));
             if (restored != null) {
-                send(restored);
+                emit(restored);
             } else {
                 uncached.add(correspondenceCounter);
             }
@@ -314,7 +304,7 @@ public class Node implements Module {
     private void handleJoin(Message message) {
         debug("received join: %s", message);
         if (MessageType.Downwards.matches(message) && message.getNodeId() == nodeId) {
-            registerMessage(message);
+            registerTracingHeaders(MessageUtil.countersToTracingHeaders(uplink.address(), uplink.registerAndListLosses(message)));
             byte assignedId = message.data(0);
             routingRegistry.add(assignedId);
             routingRegistry.add((byte) (assignedId | MessageHeader.DOWNWARDS_BIT));
@@ -324,7 +314,7 @@ public class Node implements Module {
         } else if (MessageType.Downwards.matches(message) && shouldForward(message)) {
             routingRegistry.add(message.data(0));
             routingRegistry.add((byte) (message.data(0) | MessageHeader.DOWNWARDS_BIT));
-            send(message);
+            emit(message);
         } else {
             handleDefaultAsNode(message);
         }
@@ -332,14 +322,14 @@ public class Node implements Module {
 
     private void invite(byte assignedId, Message message) {
         if (!retxRegister.knows(assignedId)) {
-            send(message);
+            emit(message);
             exec.schedule(() -> this.invite(assignedId, message), INVITE_RESPONSE_TIMEOUT);
         }
     }
     private void handleRouting(Message message) {
         debug("received routing: %s", message);
         if (MessageType.Downwards.matches(message) && message.getNodeId() == nodeId) {
-            registerMessage(message);
+            registerTracingHeaders(MessageUtil.countersToTracingHeaders(uplink.address(), uplink.registerAndListLosses(message)));
             updateRouting(message.data());
         } else {
             handleDefaultAsNode(message);
@@ -350,18 +340,7 @@ public class Node implements Module {
         debug("received message: %s", message);
         cache.store(message);
         if (shouldForward(message)) {
-            send(message);
-        }
-    }
-
-    private void registerMessage(Message message) {
-        var lost = uplink.registerAndListLosses(message);
-        for (byte b : lost) {
-            int tracingHeader = 0;
-            tracingHeader |= MessageHeader.DOWNWARDS_BIT;
-            tracingHeader |= nodeId << MessageHeader.ADDRESS_SHIFT;
-            tracingHeader |= b << MessageHeader.COUNTER_SHIFT;
-            traceCounter.putIfAbsent(tracingHeader, 0);
+            emit(message);
         }
     }
 
@@ -394,11 +373,11 @@ public class Node implements Module {
 
     public void feedData(byte... data) {
         if (uplink == null) {
-            warn("data loss in status %s: %s", status, Arrays.toString(data));
+//            warn("data loss in status %s: %s", status, Arrays.toString(data));
             return;
         }
         try {
-            send(uplink.packAndIncrement(MessageType.Data, data));
+            emit(uplink.packAndIncrement(MessageType.Data, data));
         } catch (Exception e) {
             logger.exception(e, this);
         }
@@ -435,7 +414,34 @@ public class Node implements Module {
         }
     }
 
+    private void registerLosses(byte[] losses) {
+        debug("registering losses: %s", Arrays.toString(losses));
+        for (byte b : losses) {
+            int tracingHeader = 0;
+            tracingHeader |= MessageHeader.DOWNWARDS_BIT;
+            tracingHeader |= nodeId << MessageHeader.ADDRESS_SHIFT;
+            tracingHeader |= b << MessageHeader.COUNTER_SHIFT;
+            traceCounter.putIfAbsent(tracingHeader, 0);
+        }
+    }
+
+    private void registerTracingHeaders(Collection<Integer> tracingHeaders) {
+        for (int tracingHeader : tracingHeaders) {
+            traceCounter.putIfAbsent(tracingHeader, 0);
+            if (MessageType.Resolved.matches(tracingHeader)) {
+                traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
+                continue;
+            }
+            Message restored = cache.restore(tracingHeader);
+            if (restored != null) {
+                traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
+                exec.async(() -> emit(restored));
+            }
+        }
+    }
+
     private void interpretCommand(String command) {
+        debug("command: %s", command);
         String[] parts = command.split(" ");
         byte targetId = Byte.parseByte(parts[0]);
         switch (parts[1]) {
@@ -451,26 +457,26 @@ public class Node implements Module {
 
                 if (targetId == this.nodeId) {
                     for (int j = 0; j < JOIN_VOLLEY; j++) {
-                        send(message);
+                        emit(message);
                     }
                 } else {
-                    exec.async(() -> send(message));
+                    exec.async(() -> emit(message));
                 }
             }
                 break;
             case "trace": {
                 byte[] data = new byte[parts.length - 2];
-                for (int i = 1; i < data.length; i++) data[i] = Byte.parseByte(parts[i + 2]);
-                exec.async(() -> send(pce.correspondence(targetId).pack(MessageType.Trace, data)));
+                for (int i = 2; i < parts.length; i++) data[i - 2] = Byte.parseByte(parts[i]);
+                exec.async(() -> emit(pce.correspondence(targetId).pack(MessageType.Trace, data)));
             }
                 break;
             case "update": {
                 byte[] data = new byte[parts.length - 2];
-                for (int i = 1; i < data.length; i++) data[i] = Byte.parseByte(parts[i + 2]);
+                for (int i = 2; i < parts.length; i++) data[i - 2] = Byte.parseByte(parts[i]);
                 if (targetId == this.nodeId) {
                     updateRouting(data);
                 } else {
-                    exec.async(() -> send(pce.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)));
+                    exec.async(() -> emit(pce.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)));
                 }
             }
                 break;

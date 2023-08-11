@@ -5,6 +5,8 @@ import v2.core.context.Context;
 import v2.core.domain.message.Message;
 import v2.shared.util.JsonUtil;
 
+import java.util.Collection;
+
 public class HttpDataClient implements DataSinkClient {
 
     private Http http;
@@ -21,7 +23,8 @@ public class HttpDataClient implements DataSinkClient {
     }
 
     @Override
-    public void feed(Message message) {
-        http.postResponseVoid("/data", JsonUtil.message(message));
+    public Collection<Integer> feed(Message message) {
+        var response = http.postResponseString("/data", JsonUtil.message(message));
+        return JsonUtil.parseIntList(response);
     }
 }

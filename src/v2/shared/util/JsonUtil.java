@@ -4,7 +4,8 @@ import v2.shared.api.domain.LogEntry;
 import v2.core.domain.node.NodeInfo;
 import v2.core.domain.message.Message;
 
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class JsonUtil {
 
@@ -70,5 +71,36 @@ public class JsonUtil {
         }
         sb.append("}");
         return sb.toString();
+    }
+
+    public static List<String> parseStringList(String str) {
+        if (str.equals("[]")) return new ArrayList<>();
+        return Arrays.asList(str.substring(2, str.length() -2).split("\"\\s*,\\s*\""));
+    }
+
+    public static byte[] parseByteArray(String str) {
+        if (str.equals("[]")) return new byte[]{};
+        var split = str.substring(1, str.length() -1).split("\\s*,\\s*");
+        byte[] result = new byte[split.length];
+        for (int i = 0; i < split.length; i++) {
+            result[i] = Byte.parseByte(split[i]);
+        }
+        return result;
+    }
+
+    public static List<Byte> parseByteList(String str) {
+        if (str.equals("[]")) return Collections.emptyList();
+        return Arrays.stream(str.substring(1, str.length() -1)
+                .split("\\s*,\\s*"))
+                .map(Byte::parseByte)
+                .collect(Collectors.toList());
+    }
+
+    public static List<Integer> parseIntList(String str) {
+        if (str.equals("[]")) return Collections.emptyList();
+        return Arrays.stream(str.substring(1, str.length() -1)
+                        .split("\\s*,\\s*"))
+                .map(Integer::parseInt)
+                .collect(Collectors.toList());
     }
 }

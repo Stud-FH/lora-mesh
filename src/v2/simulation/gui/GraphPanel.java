@@ -6,6 +6,7 @@ import v2.core.context.Module;
 import v2.core.domain.message.MessageHeader;
 import v2.simulation.NodeHandle;
 import v2.simulation.Simulation;
+import v2.simulation.impl.VirtualTimeExecutor;
 
 import javax.swing.*;
 import java.awt.*;
@@ -31,7 +32,7 @@ public class GraphPanel extends JPanel implements Module {
     private static final Color ERROR_H = new Color(255, 0, 0, 255);
 
     private GUI parent;
-    private Executor exec;
+    private VirtualTimeExecutor exec;
 
     private Simulation simulation;
 
@@ -45,7 +46,7 @@ public class GraphPanel extends JPanel implements Module {
     public void build(Context ctx) {
         simulation = ctx.resolve(Simulation.class);
         parent = ctx.resolve(GUI.class);
-        exec = ctx.resolve(Executor.class);
+        exec = ctx.resolve(VirtualTimeExecutor.class);
     }
 
 
@@ -133,7 +134,7 @@ public class GraphPanel extends JPanel implements Module {
             }
         });
 
-        exec.schedulePeriodic(this::repaint, 15, 200);
+        exec.schedulePeriodicStable(this::repaint, 30, 1000);
     }
 
     @Override

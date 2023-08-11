@@ -11,11 +11,6 @@ public class CommandLine implements Module {
     private Logger logger;
 
     @Override
-    public String info() {
-        return "Command Line";
-    }
-
-    @Override
     public void build(Context ctx) {
         os = ctx.resolve(OsAdapter.class);
         logger = ctx.resolve(Logger.class);

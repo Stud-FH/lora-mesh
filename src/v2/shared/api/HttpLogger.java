@@ -26,9 +26,9 @@ public class HttpLogger implements Logger {
         var data = new LogEntry();
         data.severity = severity;
         data.moduleInfo = module.info();
-        data.data = String.format("%s:\n%s", module.info(), text).getBytes();
+        data.data = text.getBytes();
         try {
-            http.postResponseVoid(String.format("/log/%d", node.sid()), JsonUtil.logEntry(data));
+            http.postResponseVoidDisableLogging(String.format("/log/%d", node.sid()), JsonUtil.logEntry(data));
         } catch (Exception ignored) {
         }
     }
@@ -36,10 +36,5 @@ public class HttpLogger implements Logger {
     @Override
     public void exception(Exception e, Module module) {
         warn(e.toString() + "\n" + Arrays.stream(e.getStackTrace()).map(Object::toString).collect(Collectors.joining("\n")), module);
-    }
-
-    @Override
-    public String info() {
-        return "Http Logger";
     }
 }
