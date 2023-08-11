@@ -51,6 +51,6 @@ public class Message implements MessageHeader {
     public String toString() {
         String direction = (header & DOWNWARDS_BIT) != 0 ? "to" : "from";
         String resend = (header & RESEND_BIT) != 0 ? " (resend)" : "";
-        return String.format("%s#%d %s %d%s: %s", MessageType.pure(this), getCounter(), direction, getNodeId(), resend, Arrays.toString(data));
+        return String.format("%s#%d %s %d%s: %s", MessageType.pure(this), getCounter(), direction, getAddress(), resend, Arrays.toString(data));
     }
 }

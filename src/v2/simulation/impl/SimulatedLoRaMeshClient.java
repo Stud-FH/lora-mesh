@@ -44,6 +44,8 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
         if (queue.isEmpty()) {
             return;
         }
+        var id = handle.id();
+
         var item = queue.poll();
         var message = item.message;
         var channel = item.channel;
@@ -55,13 +57,21 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
         }
 
         Random r = new Random();
-        simulation.all().stream()
-                .filter(NodeHandle::isAlive)
-                .filter(n -> n.listeningChannel().equals(channel))
-                .filter(n -> n != handle)
-                .filter(n -> n.reception(handle) >= r.nextDouble())
-                .forEach(other -> other.receive(message));
-
+//        simulation.all().stream()
+//                .filter(NodeHandle::isAlive)
+//                .filter(n -> channel.equals(n.listeningChannel()))
+//                .filter(n -> n != handle)
+//                .filter(n -> n.reception(handle) >= r.nextDouble())
+//                .forEach(other -> other.receive(message));
+        for (var other : simulation.all()) {
+            var a = other != handle;
+            var b = other.isAlive();
+            var c = channel.equals(other.listeningChannel());
+            var d =  other.reception(handle) >= r.nextDouble();
+            if (a&&b&&c&&d) {
+                other.receive(message);
+            }
+        }
     }
 
     @Override

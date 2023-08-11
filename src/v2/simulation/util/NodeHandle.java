@@ -26,13 +26,14 @@ public class NodeHandle implements Module {
         node = ctx.resolve(Node.class);
         specs = ctx.resolve(NodeSimulationSpecs.class);
         lora = ctx.resolve(SimulatedLoRaMeshClient.class);
-
-        ByteBuffer buf = ByteBuffer.allocate(8);
-        buf.putLong(node.sid());
-        label = new String(buf.array());
     }
 
     public String label() {
+        if (label == null) {
+            ByteBuffer buf = ByteBuffer.allocate(8);
+            buf.putLong(node.id());
+            label = new String(buf.array());
+        }
         return label;
     }
 
@@ -44,8 +45,8 @@ public class NodeHandle implements Module {
         lora.receive(message);
     }
 
-    public long sid() {
-        return specs.sid();
+    public long id() {
+        return specs.id();
     }
 
     public double x() {
@@ -74,8 +75,8 @@ public class NodeHandle implements Module {
         return distance(other.x(), other.y());
     }
 
-    public byte getNodeId() {
-        return node.getNodeId();
+    public byte address() {
+        return node.getAddress();
     }
 
     public NodeStatus getStatus() {
@@ -99,7 +100,7 @@ public class NodeHandle implements Module {
     }
 
     public double reception(NodeHandle other) {
-        return specs.reception.getOrDefault(other.sid(), distanceBasedReception(other));
+        return specs.reception.getOrDefault(other.id(), distanceBasedReception(other));
     }
 
     public double distanceBasedReception(NodeHandle other) {
@@ -109,11 +110,11 @@ public class NodeHandle implements Module {
     }
 
     public void resetReception(NodeHandle other) {
-        specs.reception.remove(other.sid());
+        specs.reception.remove(other.id());
     }
 
     public void setReception(NodeHandle other, double value) {
-        specs.reception.put(other.sid(), value);
+        specs.reception.put(other.id(), value);
     }
 
     public Set<Byte> getRoutingRegistry() {

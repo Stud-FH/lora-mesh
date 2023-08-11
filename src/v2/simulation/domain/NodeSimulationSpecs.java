@@ -34,7 +34,7 @@ public class NodeSimulationSpecs implements Node.Config, ConsoleLogger.Handle, G
     }
 
     @Override
-    public long sid() {
+    public long id() {
         return sid;
     }
 

@@ -12,8 +12,8 @@ public class JsonUtil {
     public static String nodeInfo(NodeInfo data) {
         StringBuilder sb = new StringBuilder();
         sb.append("{")
-                .append(key("serialId")).append(integer(data.serialId)).append(", ")
-                .append(key("nodeId")).append(integer(data.nodeId)).append(", ")
+                .append(key("ig")).append(integer(data.id)).append(", ")
+                .append(key("address")).append(integer(data.address)).append(", ")
                 .append(key("status")).append(string(data.status)).append(", ")
                 .append(key("retx")).append(retxMap(data.retx))
                 .append("}");

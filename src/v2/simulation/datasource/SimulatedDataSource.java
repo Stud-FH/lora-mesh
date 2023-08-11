@@ -27,7 +27,7 @@ public class SimulatedDataSource implements Module {
 
     private void feedData() {
         if (node.isAlive()) {
-            var data = String.format("%d§%d", node.sid(), counter++).getBytes();
+            var data = String.format("%d§%d", node.id(), counter++).getBytes();
             node.feedData(data);
         }
     }

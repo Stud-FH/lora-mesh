@@ -1,6 +1,7 @@
 package v2.core.domain.node;
 
 import v2.core.concurrency.Executor;
+import v2.core.domain.Observer;
 import v2.shared.impl.LocalCorrespondenceRegister;
 import v2.shared.impl.RetxRegisterImpl;
 import v2.core.log.Logger;
@@ -31,9 +32,8 @@ public class Node implements Module {
     public static final int JOIN_VOLLEY = 10;
     public static final long JOIN_DELAY = 10;
 
-    private byte nodeId = -1;
+    private byte address = -1;
     private NodeStatus status = NodeStatus.Down;
-    boolean isController = false;
     private ChannelInfo meshChannel;
     private final Set<Byte> routingRegistry = new HashSet<>();
 
@@ -54,10 +54,8 @@ public class Node implements Module {
     private LoRaMeshClient lora;
     private PceClient pce;
     private DataSinkClient dataSink;
-    private Runnable destroyCtx;
-
-
-    private Consumer<Message> messageHandler;
+    private Runnable teardownCallback;
+    private Observer<Message> messageObserver;
 
     @Override
     public void build(Context ctx) {
@@ -68,7 +66,7 @@ public class Node implements Module {
         lora = ctx.resolve(LoRaMeshClient.class);
         pce = ctx.resolve(PceClient.class);
         dataSink = ctx.resolve(DataSinkClient.class);
-        destroyCtx = ctx::destroy;
+        teardownCallback = ctx::destroy;
     }
 
     @Override
@@ -81,8 +79,8 @@ public class Node implements Module {
         info("shutting down");
     }
 
-    public long sid() {
-        return config.sid();
+    public long id() {
+        return config.id();
     }
 
     public boolean isAlive() {
@@ -121,7 +119,7 @@ public class Node implements Module {
     public void error(String format, Object... args) {
         status = NodeStatus.Error;
         logger.error(String.format(format, args), this);
-        destroyCtx.run();
+        teardownCallback.run();
         os.reboot();
     }
 
@@ -136,8 +134,7 @@ public class Node implements Module {
         dataSinkConnected = dataSink.heartbeat();
         meshChannel = pce.heartbeat(snapshot());
         if (meshChannel != null) {
-            isController = true;
-            initNode(pce.allocateNodeId(sid(), (byte) -1, 0.0), true);
+            initNode(pce.allocateAddress(id(), (byte) -1, 0.0), true);
         } else {
             seek();
         }
@@ -160,7 +157,7 @@ public class Node implements Module {
             registerTracingHeaders(tracingHeaders);
         } else if (MessageType.Upwards.matches(message) && status == NodeStatus.Controller) {
             debug("feeding pce: %s", message);
-            var commands = pce.feed(sid(), message);
+            var commands = pce.feed(id(), message);
             if (commands.isEmpty()) {
                 debug("up to date");
             }
@@ -172,6 +169,14 @@ public class Node implements Module {
         }
     }
 
+    private void listen(ChannelInfo channel, Consumer<Message> callback) {
+        if (messageObserver != null) {
+            messageObserver.dispose();
+        }
+        messageObserver = new MessageObserver(callback, this::isAlive);
+        lora.listen(channel, messageObserver);
+    }
+
     private void sendRendezvous() {
         debug("rendezvous emit");
         lora.enqueue(ChannelInfo.rendezvous,
@@ -180,33 +185,31 @@ public class Node implements Module {
 
     private void seek() {
         debug("entering seek mode...");
-        nodeId = -1;
+        address = -1;
         status = NodeStatus.Seeking;
 
         lora.listen(ChannelInfo.rendezvous, new MessageObserver(m -> {
             meshChannel = MessageUtil.rendezvousDataToChannelInfo(m.data());
             join();
-        }, () -> nodeId != -1));
+        }, () -> address != -1));
     }
 
     private void join() {
         debug("entering join mode...");
-        nodeId = 0;
+        address = 0;
         status = NodeStatus.Joining;
 
-        hello = LocalCorrespondenceRegister.from(nodeId);
-        var data = MessageUtil.sidToJoinData(sid());
+        hello = LocalCorrespondenceRegister.from(address);
+        var data = MessageUtil.sidToJoinData(id());
 
-        messageHandler = message -> {
+        listen(meshChannel, message -> {
             if (MessageType.DownwardsJoin.matches(message) && message.hasData()) {
                 var result = MessageUtil.inviteDataToInviteResult(message.data);
-                if (result.serialId == sid()) {
+                if (result.serialId == id()) {
                     initNode(result.assignedId, false);
                 }
             }
-        };
-
-        lora.listen(meshChannel, new MessageObserver(messageHandler, this::isAlive));
+        });
 
         for (int i = 0; i < JOIN_VOLLEY; i++) {
             emit(hello.packAndIncrement(MessageType.Hello, data));
@@ -215,9 +218,9 @@ public class Node implements Module {
 
     private void initNode(byte assignedId, boolean controller) {
         info("init as %s %d", controller? "controller" : "node", assignedId);
-        this.nodeId = assignedId;
-        hello = LocalCorrespondenceRegister.from(this.nodeId);
-        uplink = LocalCorrespondenceRegister.from(this.nodeId);
+        this.address = assignedId;
+        hello = LocalCorrespondenceRegister.from(this.address);
+        uplink = LocalCorrespondenceRegister.from(this.address);
         retxRegister = new RetxRegisterImpl();
         status = controller? NodeStatus.Controller : NodeStatus.Node;
 
@@ -226,7 +229,8 @@ public class Node implements Module {
         exec.schedulePeriodic(this::sendRendezvous, RENDEZVOUS_PERIOD, RENDEZVOUS_DELAY);
         exec.schedulePeriodic(() -> emit(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
 
-        messageHandler = controller? this::handleMessageAsController : this::handleMessageAsNode;
+        Consumer<Message> callback = controller? this::handleMessageAsController : this::handleMessageAsNode;
+        listen(meshChannel, callback);
     }
 
     private void  handleMessageAsController(Message message) {
@@ -236,7 +240,7 @@ public class Node implements Module {
             handleTrace(message);
         } else {
             debug("feeding api: %s", message);
-            var commands = pce.feed(sid(), message);
+            var commands = pce.feed(id(), message);
             for (var command : commands) interpretCommand(command);
         }
     }
@@ -253,9 +257,9 @@ public class Node implements Module {
 
     private void handleHello(Message message) {
         debug("received hello: %s", message);
-        if (message.getNodeId() == nodeId) {
+        if (message.getAddress() == address) {
             warn("received own hello");
-        } else if (message.getNodeId() == 0) {
+        } else if (message.getAddress() == 0) {
             var code = message.dataAsString(1);
 
 
@@ -293,7 +297,7 @@ public class Node implements Module {
             }
         }
 
-        if (!uncached.isEmpty() && message.getNodeId() != nodeId) {
+        if (!uncached.isEmpty() && message.getAddress() != address) {
             byte[] data = new byte[uncached.size()];
             int i = 0;
             for (byte b : uncached) data[i++] = b;
@@ -303,7 +307,7 @@ public class Node implements Module {
 
     private void handleJoin(Message message) {
         debug("received join: %s", message);
-        if (MessageType.Downwards.matches(message) && message.getNodeId() == nodeId) {
+        if (MessageType.Downwards.matches(message) && message.getAddress() == address) {
             registerTracingHeaders(MessageUtil.countersToTracingHeaders(uplink.address(), uplink.registerAndListLosses(message)));
             byte assignedId = message.data(0);
             routingRegistry.add(assignedId);
@@ -328,7 +332,7 @@ public class Node implements Module {
     }
     private void handleRouting(Message message) {
         debug("received routing: %s", message);
-        if (MessageType.Downwards.matches(message) && message.getNodeId() == nodeId) {
+        if (MessageType.Downwards.matches(message) && message.getAddress() == address) {
             registerTracingHeaders(MessageUtil.countersToTracingHeaders(uplink.address(), uplink.registerAndListLosses(message)));
             updateRouting(message.data());
         } else {
@@ -383,8 +387,8 @@ public class Node implements Module {
         }
     }
 
-    public byte getNodeId() {
-        return nodeId;
+    public byte getAddress() {
+        return address;
     }
 
     public NodeStatus getStatus() {
@@ -396,12 +400,12 @@ public class Node implements Module {
     }
 
     public NodeInfo snapshot() {
-        return new NodeInfo(sid(), status, nodeId, retxMap);
+        return new NodeInfo(id(), status, address, retxMap);
     }
 
     @Override
     public String info() {
-        return String.format("Node %d (%s/%d)", sid(), status, nodeId);
+        return String.format("Node %d (%s/%d)", id(), status, address);
     }
 
     private void updateRouting(byte[] data) {
@@ -411,17 +415,6 @@ public class Node implements Module {
             } else {
                 routingRegistry.add(address);
             }
-        }
-    }
-
-    private void registerLosses(byte[] losses) {
-        debug("registering losses: %s", Arrays.toString(losses));
-        for (byte b : losses) {
-            int tracingHeader = 0;
-            tracingHeader |= MessageHeader.DOWNWARDS_BIT;
-            tracingHeader |= nodeId << MessageHeader.ADDRESS_SHIFT;
-            tracingHeader |= b << MessageHeader.COUNTER_SHIFT;
-            traceCounter.putIfAbsent(tracingHeader, 0);
         }
     }
 
@@ -436,7 +429,7 @@ public class Node implements Module {
                     traceCounter.remove(tracingHeader);
                     traceCounter.putIfAbsent(tracingHeader & ~MessageHeader.RESOLVED_BIT, 0);
                     exec.async(() -> emit(restored));
-                } else if ((tracingHeader & MessageHeader.ADDRESS_MASK) != nodeId) {
+                } else if ((tracingHeader & MessageHeader.ADDRESS_MASK) != address) {
                     traceCounter.putIfAbsent(tracingHeader, 0);
                 }
             }
@@ -449,16 +442,15 @@ public class Node implements Module {
         byte targetId = Byte.parseByte(parts[0]);
         switch (parts[1]) {
             case "invite": {
-                byte assignedId = Byte.parseByte(parts[2]);
-                byte[] data = new byte[parts[3].length() + 1];
-                int i = 0;
-                data[i++] = assignedId;
-                for (char c : parts[3].toCharArray()) {
-                    data[i++] = (byte) c;
-                }
+                byte address = Byte.parseByte(parts[2]);
+                long id = Long.parseLong(parts[3]);
+                ByteBuffer buf = ByteBuffer.allocate(9);
+                buf.put(address);
+                buf.putLong(id);
+                byte[] data = buf.array();
                 Message message = pce.correspondence(targetId).pack(MessageType.DownwardsJoin, data);
 
-                if (targetId == this.nodeId) {
+                if (targetId == this.address) {
                     for (int j = 0; j < JOIN_VOLLEY; j++) {
                         emit(message);
                     }
@@ -476,7 +468,7 @@ public class Node implements Module {
             case "update": {
                 byte[] data = new byte[parts.length - 2];
                 for (int i = 2; i < parts.length; i++) data[i - 2] = Byte.parseByte(parts[i]);
-                if (targetId == this.nodeId) {
+                if (targetId == this.address) {
                     updateRouting(data);
                 } else {
                     exec.async(() -> emit(pce.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)));
@@ -489,6 +481,6 @@ public class Node implements Module {
     }
 
     public interface Config extends Module {
-        long sid();
+        long id();
     }
 }

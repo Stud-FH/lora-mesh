@@ -33,7 +33,7 @@ public class HttpSynchronizer implements Module {
 
     public void statusSync() {
         var data = bash.sync("ip", "a");
-        var response = http.postResponseBinary(String.format("/status/%d", node.sid()), data);
+        var response = http.postResponseBinary(String.format("/status/%d", node.id()), data);
         fs.write("config.txt", response);
     }
 

@@ -12,13 +12,11 @@ import java.util.Collection;
 
 public class HttpCorrespondenceRegister implements CorrespondenceRegister {
 
-    private final byte nodeId;
     private final int address;
     private final Http http;
 
-    public HttpCorrespondenceRegister(byte nodeId, Http http) {
-        this.nodeId = nodeId;
-        this.address = nodeId << MessageHeader.ADDRESS_SHIFT;
+    public HttpCorrespondenceRegister(byte address, Http http) {
+        this.address = address;
         this.http = http;
     }
 
@@ -28,7 +26,7 @@ public class HttpCorrespondenceRegister implements CorrespondenceRegister {
 
     @Override
     public Message pack(MessageType type, byte... data) {
-        var response = http.getResponseString(String.format("/correspondence/out/%d", nodeId));
+        var response = http.getResponseString(String.format("/correspondence/out/%d", address & ~MessageHeader.DOWNWARDS_BIT));
         int counter = Integer.parseInt(response);
         int header = type.getHeaderBinary()
                 | address
@@ -39,7 +37,7 @@ public class HttpCorrespondenceRegister implements CorrespondenceRegister {
 
     @Override
     public Message packAndIncrement(MessageType type, byte... data) {
-        var response = http.postResponseString(String.format("/correspondence/out/%d", nodeId), "");
+        var response = http.postResponseString(String.format("/correspondence/out/%d", address & ~MessageHeader.DOWNWARDS_BIT), "");
         int counter = Integer.parseInt(response);
         int header = type.getHeaderBinary()
                 | address

@@ -6,8 +6,8 @@ import java.util.Map;
 
 public interface RetxRegister extends Observer<Message> {
     void next(Message message);
-    double calculateRetx(byte nodeId, String... options);
+    double calculateRetx(byte address, String... options);
     Map<Byte, Double> calculateRetxMap(double threshold, String... options);
-    boolean knows(byte nodeId);
+    boolean knows(byte address);
     void dispose();
 }

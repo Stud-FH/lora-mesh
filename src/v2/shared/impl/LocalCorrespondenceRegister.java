@@ -12,12 +12,12 @@ import java.util.Set;
 
 public class LocalCorrespondenceRegister implements CorrespondenceRegister {
 
-    public static LocalCorrespondenceRegister to(int nodeId) {
-        return new LocalCorrespondenceRegister(nodeId | MessageHeader.DOWNWARDS_BIT);
+    public static LocalCorrespondenceRegister to(int address) {
+        return new LocalCorrespondenceRegister(address | MessageHeader.DOWNWARDS_BIT);
     }
 
-    public static LocalCorrespondenceRegister from(int nodeId) {
-        return new LocalCorrespondenceRegister(nodeId);
+    public static LocalCorrespondenceRegister from(int address) {
+        return new LocalCorrespondenceRegister(address & ~MessageHeader.DOWNWARDS_BIT);
     }
 
     private static final int counterLimit = 1 << MessageHeader.COUNTER_BITS;

@@ -9,7 +9,6 @@ import v2.core.context.Context;
 import v2.core.domain.message.Message;
 
 import java.util.List;
-import java.util.function.Supplier;
 
 public class GuardedPceClient implements PceClient {
 
@@ -42,20 +41,20 @@ public class GuardedPceClient implements PceClient {
     }
 
     @Override
-    public byte allocateNodeId(long sid, byte mediatorId, double mediatorRetx) {
-        if (handle.pceDisabled()) throw new RuntimeException("invalid call of PceClient.allocateNodeId()");
-        return pce.allocateNodeId(sid, mediatorId, mediatorRetx);
+    public byte allocateAddress(long sid, byte mediatorId, double mediatorRetx) {
+        if (handle.pceDisabled()) throw new IllegalStateException("disabled");
+        return pce.allocateAddress(sid, mediatorId, mediatorRetx);
     }
 
     @Override
-    public CorrespondenceRegister correspondence(byte nodeId) {
-        if (handle.pceDisabled()) throw new RuntimeException("invalid call of PceClient.correspondence()");
-        return pce.correspondence(nodeId);
+    public CorrespondenceRegister correspondence(byte address) {
+        if (handle.pceDisabled()) throw new IllegalStateException("disabled");
+        return pce.correspondence(address);
     }
 
     @Override
     public List<String> feed(long controllerId, Message message) {
-        if (handle.pceDisabled()) throw new RuntimeException("invalid call of PceClient.feed()");
+        if (handle.pceDisabled()) throw new IllegalStateException("disabled");
         return pce.feed(controllerId, message);
     }
 

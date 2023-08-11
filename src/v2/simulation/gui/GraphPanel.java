@@ -5,7 +5,6 @@ import v2.core.context.Module;
 import v2.core.domain.message.MessageHeader;
 import v2.simulation.util.NodeHandle;
 import v2.simulation.Simulation;
-import v2.simulation.impl.VirtualTimeExecutor;
 
 import javax.swing.*;
 import java.awt.*;
@@ -30,8 +29,7 @@ public class GraphPanel extends JPanel implements Module {
     private static final Color ERROR = new Color(255, 0, 0, 100);
     private static final Color ERROR_H = new Color(255, 0, 0, 255);
 
-    private GUI parent;
-    private VirtualTimeExecutor exec;
+    private GUI gui;
 
     private Simulation simulation;
 
@@ -44,8 +42,7 @@ public class GraphPanel extends JPanel implements Module {
     @Override
     public void build(Context ctx) {
         simulation = ctx.resolve(Simulation.class);
-        parent = ctx.resolve(GUI.class);
-        exec = ctx.resolve(VirtualTimeExecutor.class);
+        gui = ctx.resolve(GUI.class);
     }
 
 
@@ -64,7 +61,7 @@ public class GraphPanel extends JPanel implements Module {
                         String def = String.format("%.2f (default)", simulation.getSelected().distanceBasedReception(closest));
                         Object[] possibilities = {def, "1.0", "0.9", "0.8", "0.7", "0.6", "0.5", "0.4", "0.3", "0.2", "0.1", "0.0"};
                         String s = (String)JOptionPane.showInputDialog(
-                                parent,
+                                gui,
                                 String.format("current reception: %.2f)", simulation.getSelected().reception(closest)),
                                 String.format("Transmission Reliability %s - %s", simulation.getSelected().label(), closest.label()),
                                 JOptionPane.PLAIN_MESSAGE,
@@ -86,7 +83,7 @@ public class GraphPanel extends JPanel implements Module {
                     }
                 } else {
                     String label = JOptionPane.showInputDialog(
-                            parent,
+                            gui,
                             "Please enter a label for the new node:",
                             "Node Label",
                             JOptionPane.PLAIN_MESSAGE);
@@ -132,8 +129,6 @@ public class GraphPanel extends JPanel implements Module {
                 zoom *= Math.pow(0.9, e.getPreciseWheelRotation());
             }
         });
-
-        exec.schedulePeriodicStable(this::repaint, 30, 1000);
     }
 
     @Override
@@ -163,13 +158,13 @@ public class GraphPanel extends JPanel implements Module {
             g2.setColor(new Color(200, 200, 200));
             if (simulation.view.equals("upwards")) {
                 for (var other : simulation.all()) {
-                    if (node.getRoutingRegistry().contains(other.getNodeId())) {
+                    if (node.getRoutingRegistry().contains(other.address())) {
                         g2.drawLine(x(node), y(node), x(other), y(other));
                     }
                 }
             } else if (simulation.view.equals("downwards")) {
                 for (var other : simulation.all())
-                    if (node.getRoutingRegistry().contains((byte) (other.getNodeId() ^ (MessageHeader.DOWNWARDS_BIT >>> MessageHeader.ADDRESS_SHIFT)))) {
+                    if (node.getRoutingRegistry().contains((byte) (other.address() ^ (MessageHeader.DOWNWARDS_BIT >>> MessageHeader.ADDRESS_SHIFT)))) {
                     g2.drawLine(x(node), y(node), x(other), y(other));
                 }
             }

@@ -9,8 +9,8 @@ import java.util.List;
 public interface PceClient extends Module {
 
     ChannelInfo heartbeat(NodeInfo nodeInfo);
-    byte allocateNodeId(long sid, byte mediatorId, double mediatorRetx);
-    CorrespondenceRegister correspondence(byte nodeId);
+    byte allocateAddress(long sid, byte mediatorId, double mediatorRetx);
+    CorrespondenceRegister correspondence(byte address);
     List<String> feed(long controllerId, Message message);
 
 }

@@ -39,7 +39,7 @@ public class GuardedDataSinkClient implements DataSinkClient {
 
     @Override
     public Collection<Integer> feed(Message message) {
-        if (handle.dataSinkDisabled()) throw new RuntimeException("invalid call of DataSinkClient.feed()");
+        if (handle.dataSinkDisabled()) throw new IllegalStateException("disabled");
         return data.feed(message);
     }
 

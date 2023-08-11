@@ -15,7 +15,7 @@ package v2.core.domain.message;
  * </p>
  * <p>
  *     address: <br/>
- *     [downwards bit] [0] [node id] <br/>
+ *     [downwards bit] [0] [node address] <br/>
  *     the downwards bit indicates the direction in which the message travels: <br/>
  *     - downwards, meaning from controller to node (1) <br/>
  *     - upwards, meaning from node to controller (0) <br/>
@@ -27,10 +27,6 @@ public interface MessageHeader {
     int ADDRESS_BITS = 8; // CONFIGURABLE. proposed: 8
     int ADDRESS_SHIFT = 0;
     int ADDRESS_MASK = (-1 << ADDRESS_SHIFT) ^ (-1 << (ADDRESS_SHIFT + ADDRESS_BITS));
-
-    int NODE_ID_BITS = ADDRESS_BITS - 2; // part of address
-    int NODE_ID_SHIFT = ADDRESS_SHIFT;
-    int NODE_ID_MASK = (-1 << NODE_ID_SHIFT) ^ (-1 << (NODE_ID_SHIFT + NODE_ID_BITS));
 
     int ADDRESS_MULTIPURPOSE_BIT = 1 << (ADDRESS_BITS - 2);
     int RESEND_BIT = ADDRESS_MULTIPURPOSE_BIT; // as part of message header, indicates that this message was lost before and should ignore cache
@@ -63,16 +59,20 @@ public interface MessageHeader {
 
     int getHeaderBinary();
 
-    default byte getNodeId() {
-        return (byte) ((getHeaderBinary() & NODE_ID_MASK) >>> NODE_ID_SHIFT);
+    default byte getNodeAddress() {
+        return (byte) ((getHeaderBinary() & ADDRESS_MASK & ~DOWNWARDS_BIT & ~ADDRESS_MULTIPURPOSE_BIT) >>> ADDRESS_SHIFT);
+    }
+
+    default byte getRoutingAddress() {
+        return (byte) ((getHeaderBinary() & ADDRESS_MASK & ~ADDRESS_MULTIPURPOSE_BIT) >>> ADDRESS_SHIFT);
+    }
+
+    default byte getAddress() {
+        return (byte) ((getHeaderBinary() & ADDRESS_MASK) >>> ADDRESS_SHIFT);
     }
 
     default int getCounter() {
         return (getHeaderBinary() & COUNTER_MASK) >>> COUNTER_SHIFT;
-    }
-
-    default byte getRoutingAddress() {
-        return (byte) ((getHeaderBinary() & (NODE_ID_MASK | DOWNWARDS_BIT)) >>> ADDRESS_SHIFT);
     }
 
     default int getTracingHeader(byte counter) {

@@ -16,4 +16,14 @@ public class ChannelInfo implements Serializable {
     public String toString() {
         return code;
     }
+
+    @Override
+    public boolean equals(Object other) {
+        return code.equals(other.toString());
+    }
+
+    @Override
+    public int hashCode() {
+        return code.hashCode();
+    }
 }

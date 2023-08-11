@@ -16,16 +16,16 @@ public class RetxRegisterImpl implements RetxRegister {
     protected static final int COUNTER_LIMIT = 1 << MessageHeader.COUNTER_BITS;
 
     private boolean expired = false;
-    private final Map<Byte, Entry> perNodeId = new HashMap<>();
+    private final Map<Byte, Entry> perAddress = new HashMap<>();
 
-    public boolean knows(byte nodeId) {
-        return perNodeId.containsKey(nodeId);
+    public boolean knows(byte address) {
+        return perAddress.containsKey(address);
     }
 
     @Override
     public void dispose() {
         expired = true;
-        perNodeId.clear();
+        perAddress.clear();
     }
 
     @Override
@@ -38,16 +38,16 @@ public class RetxRegisterImpl implements RetxRegister {
         if (expired) throw new IllegalStateException();
         if (!MessageType.Hello.matches(message)) return;
         int counter = message.getCounter();
-        var entry = perNodeId.computeIfAbsent(message.getNodeId(), nid -> new Entry(counter));
+        var entry = perAddress.computeIfAbsent(message.getNodeAddress(), address -> new Entry(counter));
         entry.currentReceivedCounter++;
         entry.currentMissedCounter += counter - entry.expectedCounter;
         entry.expectedCounter = (counter + COUNTER_LIMIT) % COUNTER_LIMIT;
     }
 
     @Override
-    public double calculateRetx(byte nodeId, String... options) {
+    public double calculateRetx(byte address, String... options) {
         if (expired) throw new IllegalStateException();
-        var entry = perNodeId.getOrDefault(nodeId, null);
+        var entry = perAddress.getOrDefault(address, null);
         if (entry == null) return 0;
 
         double currentlyMeasured = entry.currentReceivedCounter / (entry.currentReceivedCounter + entry.currentMissedCounter);
@@ -67,9 +67,9 @@ public class RetxRegisterImpl implements RetxRegister {
     @Override
     public Map<Byte, Double> calculateRetxMap(double threshold, String... options) {
         Map<Byte, Double> result = new HashMap<>();
-        perNodeId.keySet().forEach(nodeId -> {
-            double retx = calculateRetx(nodeId, options);
-            if (retx >= threshold) result.put(nodeId, retx);
+        perAddress.keySet().forEach(address -> {
+            double retx = calculateRetx(address, options);
+            if (retx >= threshold) result.put(address, retx);
         });
         return result;
     }

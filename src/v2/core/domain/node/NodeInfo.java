@@ -2,25 +2,27 @@ package v2.core.domain.node;
 
 import java.util.Map;
 
+// TODO remove
 public class NodeInfo {
-    public final long serialId;
+
+    public final long id;
     public final NodeStatus status;
-    public final int nodeId;
+    public final int address;
     public final Map<Integer, Double> retx;
 
-    public NodeInfo(long serialId, NodeStatus status, int nodeId, Map<Integer, Double> retx) {
-        this.serialId = serialId;
+    public NodeInfo(long id, NodeStatus status, int address, Map<Integer, Double> retx) {
+        this.id = id;
         this.status = status;
-        this.nodeId = nodeId;
+        this.address = address;
         this.retx = retx;
     }
 
     @Override
     public String toString() {
         return "NodeInfo{" +
-                "serialId=" + serialId +
+                "id=" + id +
                 ", status=" + status +
-                ", nodeId=" + nodeId +
+                ", address=" + address +
                 ", retx=" + retx +
                 '}';
     }

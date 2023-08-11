@@ -33,15 +33,15 @@ public class HttpPceClient implements PceClient {
     }
 
     @Override
-    public byte allocateNodeId(long serialId, byte mediatorId, double mediatorRetx) {
+    public byte allocateAddress(long serialId, byte mediatorId, double mediatorRetx) {
         String response = http.postResponseString(
                 String.format("/pce/node-id?mediatorId=%d&mediatorRetx=%,.4f", mediatorId, mediatorRetx), serialId + "");
         return Byte.parseByte(response);
     }
 
     @Override
-    public CorrespondenceRegister correspondence(byte nodeId) {
-        return new HttpCorrespondenceRegister(nodeId, http);
+    public CorrespondenceRegister correspondence(byte address) {
+        return new HttpCorrespondenceRegister(address, http);
     }
 
     @Override

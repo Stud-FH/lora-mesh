@@ -28,7 +28,7 @@ public class HttpLogger implements Logger {
         data.moduleInfo = module.info();
         data.data = text.getBytes();
         try {
-            http.postResponseVoidDisableLogging(String.format("/log/%d", node.sid()), JsonUtil.logEntry(data));
+            http.postResponseVoidDisableLogging(String.format("/log/%d", node.id()), JsonUtil.logEntry(data));
         } catch (Exception ignored) {
         }
     }

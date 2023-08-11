@@ -5,11 +5,16 @@ import v2.core.context.Module;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class GUI extends JFrame implements Module {
 
     GraphPanel graph;
     ControlPanel control;
+
+    private final ScheduledExecutorService repaint = new ScheduledThreadPoolExecutor(1);
 
     public GUI() {
         super("Lora Mesh OpenFlow Simulator");
@@ -32,5 +37,12 @@ public class GUI extends JFrame implements Module {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setVisible(true);
+
+        repaint.scheduleAtFixedRate(this::repaint, 30, 30, TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public void destroy() {
+        repaint.shutdownNow();
     }
 }
