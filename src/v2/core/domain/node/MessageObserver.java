@@ -1,6 +1,6 @@
 package v2.core.domain.node;
 
-import v2.core.domain.Observer;
+import v2.core.common.Observer;
 import v2.core.domain.message.Message;
 
 import java.util.function.Consumer;

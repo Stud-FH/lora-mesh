@@ -1,8 +1,8 @@
 package v2.production.impl;
 
-import v2.shared.integration.CommandLine;
-import v2.core.domain.OsAdapter;
 import v2.core.context.Context;
+import v2.core.domain.OsAdapter;
+import v2.shared.integration.CommandLine;
 
 import java.nio.file.Path;
 

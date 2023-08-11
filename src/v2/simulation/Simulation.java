@@ -1,25 +1,25 @@
 package v2.simulation;
 
-import v2.shared.api.Http;
-import v2.shared.api.HttpDataClient;
-import v2.shared.api.HttpLogger;
-import v2.shared.api.HttpPceClient;
-import v2.shared.impl.ConsoleLogger;
-import v2.shared.integration.FileClient;
-import v2.shared.impl.FileLogger;
-import v2.core.log.LogMultiplexer;
-import v2.core.log.Logger;
 import v2.core.context.Context;
 import v2.core.domain.node.Node;
-import v2.simulation.domain.NodeSimulationSpecs;
+import v2.core.log.LogMultiplexer;
+import v2.core.log.Logger;
+import v2.shared.api.Http;
+import v2.shared.api.HttpDataSinkModuleModule;
+import v2.shared.api.HttpLogger;
+import v2.shared.api.HttpPceModule;
+import v2.shared.impl.ConsoleLogger;
+import v2.shared.impl.FileLogger;
+import v2.shared.integration.FileClient;
+import v2.shared.testing.GuardedDataSinkModule;
+import v2.shared.testing.GuardedPceModule;
 import v2.simulation.datasource.SimulatedDataSource;
+import v2.simulation.domain.NodeSimulationSpecs;
 import v2.simulation.gui.ControlPanel;
 import v2.simulation.gui.GUI;
 import v2.simulation.gui.GraphPanel;
-import v2.shared.testing.GuardedDataSinkClient;
-import v2.shared.testing.GuardedPceClient;
 import v2.simulation.impl.PseudoOs;
-import v2.simulation.impl.SimulatedLoRaMeshClient;
+import v2.simulation.impl.SimulatedLoRaMeshModule;
 import v2.simulation.impl.VirtualTimeExecutor;
 import v2.simulation.util.NodeHandle;
 
@@ -34,8 +34,8 @@ import java.util.function.Consumer;
 
 public class Simulation implements ConsoleLogger.Handle, FileClient.Config, VirtualTimeExecutor.Config, Http.Config, SimulatedDataSource.Config, Serializable {
 
-    public static Path root = Path.of(String.format("%s/LoraMesh/simulation", System.getenv("LOCALAPPDATA")));
-    public static URI api = URI.create("http://localhost:8080");
+    public static final Path root = Path.of(String.format("%s/LoraMesh/simulation", System.getenv("LOCALAPPDATA")));
+    public static final URI api = URI.create("http://localhost:8080");
 
     private final List<NodeSimulationSpecs> specsList = new ArrayList<>();
     private transient Context sharedContext;
@@ -46,7 +46,7 @@ public class Simulation implements ConsoleLogger.Handle, FileClient.Config, Virt
     private transient List<Consumer<NodeHandle>> selectionListeners;
     public int timeControl = 1;
     public String view = "plain";
-    public Logger.Severity logLevel = Logger.Severity.Debug;
+    public final Logger.Severity logLevel = Logger.Severity.Debug;
 
     @Override
     public void build(Context ctx) {
@@ -69,9 +69,9 @@ public class Simulation implements ConsoleLogger.Handle, FileClient.Config, Virt
                 .register(new Node())
                 .register(new PseudoOs(this))
                 .register(new LogMultiplexer(new ConsoleLogger(), new FileLogger(), new HttpLogger()))
-                .register(new GuardedDataSinkClient(new HttpDataClient()))
-                .register(new GuardedPceClient(new HttpPceClient()))
-                .register(new SimulatedLoRaMeshClient())
+                .register(new GuardedDataSinkModule(new HttpDataSinkModuleModule()))
+                .register(new GuardedPceModule(new HttpPceModule()))
+                .register(new SimulatedLoRaMeshModule())
                 .register(new SimulatedDataSource())
                 .build().deploy());
         handle.add(nodeHandle);

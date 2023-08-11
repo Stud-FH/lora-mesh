@@ -59,16 +59,16 @@ public interface MessageHeader {
 
     int getHeaderBinary();
 
-    default byte getNodeAddress() {
-        return (byte) ((getHeaderBinary() & ADDRESS_MASK & ~DOWNWARDS_BIT & ~ADDRESS_MULTIPURPOSE_BIT) >>> ADDRESS_SHIFT);
+    default int getNodeAddress() {
+        return (getHeaderBinary() & ADDRESS_MASK & ~DOWNWARDS_BIT & ~ADDRESS_MULTIPURPOSE_BIT) >>> ADDRESS_SHIFT;
     }
 
-    default byte getRoutingAddress() {
-        return (byte) ((getHeaderBinary() & ADDRESS_MASK & ~ADDRESS_MULTIPURPOSE_BIT) >>> ADDRESS_SHIFT);
+    default int getRoutingAddress() {
+        return (getHeaderBinary() & ADDRESS_MASK & ~ADDRESS_MULTIPURPOSE_BIT) >>> ADDRESS_SHIFT;
     }
 
-    default byte getAddress() {
-        return (byte) ((getHeaderBinary() & ADDRESS_MASK) >>> ADDRESS_SHIFT);
+    default int getAddress() {
+        return (getHeaderBinary() & ADDRESS_MASK) >>> ADDRESS_SHIFT;
     }
 
     default int getCounter() {

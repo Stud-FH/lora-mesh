@@ -1,16 +1,16 @@
 package v2.simulation.domain;
 
-import v2.core.log.Logger;
 import v2.core.domain.node.Node;
+import v2.core.log.Logger;
 import v2.shared.impl.ConsoleLogger;
-import v2.shared.testing.GuardedDataSinkClient;
-import v2.shared.testing.GuardedPceClient;
+import v2.shared.testing.GuardedDataSinkModule;
+import v2.shared.testing.GuardedPceModule;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class NodeSimulationSpecs implements Node.Config, ConsoleLogger.Handle, GuardedDataSinkClient.Handle, GuardedPceClient.Handle, Serializable {
+public class NodeSimulationSpecs implements Node.Config, ConsoleLogger.Handle, GuardedDataSinkModule.Handle, GuardedPceModule.Handle, Serializable {
 
     private final long sid;
     private double x, y;

@@ -1,21 +1,21 @@
 package v2.shared.util;
 
-import v2.shared.api.domain.LogEntry;
-import v2.core.domain.node.NodeInfo;
 import v2.core.domain.message.Message;
+import v2.core.domain.node.Node;
+import v2.shared.api.domain.LogEntry;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class JsonUtil {
 
-    public static String nodeInfo(NodeInfo data) {
+    public static String nodeInfo(Node node) {
         StringBuilder sb = new StringBuilder();
         sb.append("{")
-                .append(key("ig")).append(integer(data.id)).append(", ")
-                .append(key("address")).append(integer(data.address)).append(", ")
-                .append(key("status")).append(string(data.status)).append(", ")
-                .append(key("retx")).append(retxMap(data.retx))
+                .append(key("id")).append(integer(node.id())).append(", ")
+                .append(key("address")).append(integer(node.address())).append(", ")
+                .append(key("status")).append(string(node.status())).append(", ")
+                .append(key("retx")).append(retxMap(node.retx()))
                 .append("}");
         return sb.toString();
     }

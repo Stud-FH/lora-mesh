@@ -1,9 +1,9 @@
 package v2.shared.integration;
 
-import v2.core.log.Logger;
-import v2.core.domain.OsAdapter;
 import v2.core.context.Context;
 import v2.core.context.Module;
+import v2.core.domain.OsAdapter;
+import v2.core.log.Logger;
 
 public class CommandLine implements Module {
 

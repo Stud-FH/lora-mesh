@@ -1,8 +1,8 @@
 package v2.shared.integration;
 
-import v2.core.log.Logger;
 import v2.core.context.Context;
 import v2.core.context.Module;
+import v2.core.log.Logger;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -66,29 +66,6 @@ public class FileClient implements Module {
         logger.debug(String.format("writing to file %s: %s", path, data.length > 50? String.format("(%d bytes)", data.length) : new String(data)), this);
         try {
             Files.write(path, data);
-        } catch (Exception e) {
-            logger.exception(e, this);
-        }
-    }
-
-    public FileWriter open(String path) {
-        return open(resolve(path));
-    }
-
-    public FileWriter open(Path path) {
-        logger.debug(String.format("opening file %s", path), this);
-        try {
-            return new FileWriter(path.toFile());
-        } catch (Exception e) {
-            logger.exception(e, this);
-            throw new RuntimeException("file opening failed");
-        }
-    }
-
-    public void close(FileWriter writer) {
-        logger.debug("closing file writer", this);
-        try {
-            writer.close();
         } catch (Exception e) {
             logger.exception(e, this);
         }

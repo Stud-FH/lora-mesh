@@ -1,10 +1,10 @@
 package v2.production.datasource;
 
 import v2.core.concurrency.Executor;
-import v2.shared.integration.CommandLine;
 import v2.core.context.Context;
 import v2.core.context.Module;
 import v2.core.domain.node.Node;
+import v2.shared.integration.CommandLine;
 
 public class RpiTemperatureSensor implements Module {
 

@@ -1,26 +1,25 @@
 package v2.production;
 
-import v2.production.impl.E32LoRaMeshClient;
-import v2.production.impl.LinuxAdapter;
-import v2.production.maintenance.HttpSynchronizer;
-import v2.production.datasource.RpiTemperatureSensor;
-import v2.production.util.ConfigReader;
-import v2.shared.api.Http;
-import v2.shared.api.HttpDataClient;
-import v2.shared.api.HttpLogger;
-import v2.shared.api.HttpPceClient;
-import v2.shared.integration.CommandLine;
-import v2.shared.impl.ConsoleLogger;
-import v2.shared.integration.FileClient;
-import v2.shared.impl.FileLogger;
-import v2.core.log.LogMultiplexer;
-import v2.shared.impl.SimpleExecutor;
 import v2.core.context.Context;
 import v2.core.domain.node.Node;
-import v2.shared.testing.GuardedDataSinkClient;
-import v2.shared.testing.GuardedPceClient;
+import v2.core.log.LogMultiplexer;
+import v2.production.datasource.RpiTemperatureSensor;
+import v2.production.impl.E32LoRaMeshModule;
+import v2.production.impl.LinuxAdapter;
+import v2.production.maintenance.HttpSynchronizer;
+import v2.production.util.ConfigReader;
+import v2.shared.api.Http;
+import v2.shared.api.HttpDataSinkModuleModule;
+import v2.shared.api.HttpLogger;
+import v2.shared.api.HttpPceModule;
+import v2.shared.impl.ConsoleLogger;
+import v2.shared.impl.FileLogger;
+import v2.shared.impl.SimpleExecutor;
+import v2.shared.integration.CommandLine;
+import v2.shared.integration.FileClient;
+import v2.shared.testing.GuardedDataSinkModule;
+import v2.shared.testing.GuardedPceModule;
 
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 
 public class Production {
@@ -42,9 +41,9 @@ public class Production {
                 .register(new CommandLine())
                 .register(new FileClient())
                 .register(new Http())
-                .register(new GuardedDataSinkClient(new HttpDataClient()))
-                .register(new GuardedPceClient(new HttpPceClient()))
-                .register(new E32LoRaMeshClient())
+                .register(new GuardedDataSinkModule(new HttpDataSinkModuleModule()))
+                .register(new GuardedPceModule(new HttpPceModule()))
+                .register(new E32LoRaMeshModule())
                 .register(new HttpSynchronizer())
                 .register(new RpiTemperatureSensor())
                 .register(new SimpleExecutor())

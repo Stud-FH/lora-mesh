@@ -3,8 +3,8 @@ package v2.simulation.gui;
 import v2.core.context.Context;
 import v2.core.context.Module;
 import v2.core.domain.message.MessageHeader;
-import v2.simulation.util.NodeHandle;
 import v2.simulation.Simulation;
+import v2.simulation.util.NodeHandle;
 
 import javax.swing.*;
 import java.awt.*;
@@ -164,7 +164,7 @@ public class GraphPanel extends JPanel implements Module {
                 }
             } else if (simulation.view.equals("downwards")) {
                 for (var other : simulation.all())
-                    if (node.getRoutingRegistry().contains((byte) (other.address() ^ (MessageHeader.DOWNWARDS_BIT >>> MessageHeader.ADDRESS_SHIFT)))) {
+                    if (node.getRoutingRegistry().contains(other.address() ^ (MessageHeader.DOWNWARDS_BIT >>> MessageHeader.ADDRESS_SHIFT))) {
                     g2.drawLine(x(node), y(node), x(other), y(other));
                 }
             }
@@ -189,7 +189,7 @@ public class GraphPanel extends JPanel implements Module {
     }
 
     private Color getColor(NodeHandle node) {
-        switch (node.getStatus()) {
+        switch (node.status()) {
             case Controller: return node == highlighted? CONTROLLER_H : CONTROLLER;
             case Node: return node == highlighted? NODE_H : NODE;
             case Joining: return node == highlighted? JOINING_H : JOINING;

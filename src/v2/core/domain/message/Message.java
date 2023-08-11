@@ -30,14 +30,6 @@ public class Message implements MessageHeader {
         return data.length;
     }
 
-    public String dataAsString() {
-        return new String(data);
-    }
-
-    public String dataAsString(int from) {
-        return new String(data).substring(from);
-    }
-
     public int header() {
         return header;
     }

@@ -16,9 +16,10 @@ public class RetxRegisterImpl implements RetxRegister {
     protected static final int COUNTER_LIMIT = 1 << MessageHeader.COUNTER_BITS;
 
     private boolean expired = false;
-    private final Map<Byte, Entry> perAddress = new HashMap<>();
+    private final Map<Integer, Entry> perAddress = new HashMap<>();
 
-    public boolean knows(byte address) {
+    @Override
+    public boolean knows(int address) {
         return perAddress.containsKey(address);
     }
 
@@ -45,7 +46,7 @@ public class RetxRegisterImpl implements RetxRegister {
     }
 
     @Override
-    public double calculateRetx(byte address, String... options) {
+    public double calculateRetx(int address, String... options) {
         if (expired) throw new IllegalStateException();
         var entry = perAddress.getOrDefault(address, null);
         if (entry == null) return 0;
@@ -65,8 +66,8 @@ public class RetxRegisterImpl implements RetxRegister {
     }
 
     @Override
-    public Map<Byte, Double> calculateRetxMap(double threshold, String... options) {
-        Map<Byte, Double> result = new HashMap<>();
+    public Map<Integer, Double> calculateRetx(double threshold, String... options) {
+        Map<Integer, Double> result = new HashMap<>();
         perAddress.keySet().forEach(address -> {
             double retx = calculateRetx(address, options);
             if (retx >= threshold) result.put(address, retx);
@@ -78,7 +79,7 @@ public class RetxRegisterImpl implements RetxRegister {
         int expectedCounter;
         double currentReceivedCounter = 0;
         double currentMissedCounter = 0;
-        LinkedList<Double> history = new LinkedList<>();
+        final LinkedList<Double> history = new LinkedList<>();
 
         Entry(int initialCounter) {
             this.expectedCounter = initialCounter;

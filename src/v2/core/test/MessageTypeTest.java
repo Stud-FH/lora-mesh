@@ -1,8 +1,7 @@
 package v2.core.test;
 
-import v2.core.domain.message.MessageType;
-
 import org.junit.jupiter.api.Test;
+import v2.core.domain.message.MessageType;
 
 import java.util.HashSet;
 import java.util.Set;

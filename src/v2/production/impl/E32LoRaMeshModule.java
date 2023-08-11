@@ -1,20 +1,21 @@
 package v2.production.impl;
 
+import v2.core.common.Subject;
 import v2.core.concurrency.Executor;
-import v2.shared.integration.CommandLine;
-import v2.core.log.Logger;
-import v2.core.domain.ChannelInfo;
-import v2.core.domain.LoRaMeshClient;
-import v2.core.domain.Observer;
 import v2.core.context.Context;
+import v2.core.domain.ChannelInfo;
+import v2.core.domain.LoRaMeshModule;
+import v2.core.common.Observer;
 import v2.core.domain.message.Message;
+import v2.core.log.Logger;
+import v2.shared.integration.CommandLine;
 
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Scanner;
 
-public class E32LoRaMeshClient implements LoRaMeshClient {
+public class E32LoRaMeshModule implements LoRaMeshModule {
 
     public static final long COOLDOWN = 1000;
 
@@ -66,7 +67,7 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
     @Override
     public void listen(ChannelInfo channel, Observer<Message> observer) {
         processInput(closeListeningChannel(), listeningObserver);
-        if (listeningObserver != null) listeningObserver.dispose();
+//        if (listeningObserver != null) listeningObserver.dispose(); // FIXME
         logger.debug("now listening on channel " + channel.code, this);
         listeningChannel = channel;
         listeningObserver = observer;
@@ -101,7 +102,7 @@ public class E32LoRaMeshClient implements LoRaMeshClient {
     }
 
     private void processInput(String input, Observer<Message> observer) {
-        if (input.isEmpty() || observer == null || observer.isExpired()) return;
+//        if (input.isEmpty() || observer == null || observer.isExpired()) return; // FIXME
         Scanner sc = new Scanner(input);
         while (sc.hasNext(messagePattern)) {
             String in = sc.next(messagePattern);

@@ -1,14 +1,14 @@
 package v2.simulation.util;
 
-import v2.core.log.Logger;
-import v2.core.domain.ChannelInfo;
 import v2.core.context.Context;
 import v2.core.context.Module;
+import v2.core.domain.ChannelInfo;
 import v2.core.domain.message.Message;
 import v2.core.domain.node.Node;
 import v2.core.domain.node.NodeStatus;
+import v2.core.log.Logger;
 import v2.simulation.domain.NodeSimulationSpecs;
-import v2.simulation.impl.SimulatedLoRaMeshClient;
+import v2.simulation.impl.SimulatedLoRaMeshModule;
 
 import java.nio.ByteBuffer;
 import java.util.Random;
@@ -18,14 +18,14 @@ public class NodeHandle implements Module {
 
     private Node node;
     private NodeSimulationSpecs specs;
-    private SimulatedLoRaMeshClient lora;
+    private SimulatedLoRaMeshModule lora;
     private String label;
 
     @Override
     public void build(Context ctx) {
         node = ctx.resolve(Node.class);
         specs = ctx.resolve(NodeSimulationSpecs.class);
-        lora = ctx.resolve(SimulatedLoRaMeshClient.class);
+        lora = ctx.resolve(SimulatedLoRaMeshModule.class);
     }
 
     public String label() {
@@ -47,6 +47,14 @@ public class NodeHandle implements Module {
 
     public long id() {
         return specs.id();
+    }
+
+    public int address() {
+        return node.address();
+    }
+
+    public NodeStatus status() {
+        return node.status().value();
     }
 
     public double x() {
@@ -73,14 +81,6 @@ public class NodeHandle implements Module {
 
     public double distance(NodeHandle other) {
         return distance(other.x(), other.y());
-    }
-
-    public byte address() {
-        return node.getAddress();
-    }
-
-    public NodeStatus getStatus() {
-        return node.getStatus();
     }
 
     public boolean isAlive() {
@@ -117,7 +117,7 @@ public class NodeHandle implements Module {
         specs.reception.put(other.id(), value);
     }
 
-    public Set<Byte> getRoutingRegistry() {
+    public Set<Integer> getRoutingRegistry() {
         return node.getRoutingRegistry();
     }
 

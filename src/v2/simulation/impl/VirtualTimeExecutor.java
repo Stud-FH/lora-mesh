@@ -1,25 +1,31 @@
 package v2.simulation.impl;
 
 import v2.core.concurrency.Executor;
-import v2.core.log.Logger;
 import v2.core.context.Context;
 import v2.core.context.Module;
+import v2.core.log.Logger;
+import v2.shared.measurements.ExecutorInsights;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Queue;
 
-public class VirtualTimeExecutor implements Executor {
+public class VirtualTimeExecutor implements Executor, ExecutorInsights {
 
     private Config config;
     private Thread scheduler;
     private Thread[] workerArray;
+    private long taskCounter = 0;
     private boolean running = true;
     private boolean paused = true;
     private final Collection<ExecutionItem> items = new ArrayList<>();
     private final Queue<Runnable> pending = new LinkedList<>();
     private Logger logger;
+
+    public synchronized long taskCounter() {
+        return taskCounter;
+    }
 
     public boolean paused() {
         return paused;
@@ -41,11 +47,6 @@ public class VirtualTimeExecutor implements Executor {
 
     public synchronized void schedulePeriodic(Runnable task, long period, long delay) {
         items.add(new ExecutionItem(task, System.currentTimeMillis() - period + delay, period, true));
-        notifyAll();
-    }
-
-    public synchronized void schedulePeriodicStable(Runnable task, long period, long delay) {
-        items.add(new StableExecutionItem(task, System.currentTimeMillis() - period + delay, period, true));
         notifyAll();
     }
 
@@ -88,6 +89,7 @@ public class VirtualTimeExecutor implements Executor {
         while (pending.isEmpty()) {
             wait(10);
         }
+        taskCounter++;
         return pending.poll();
     }
 
@@ -170,23 +172,6 @@ public class VirtualTimeExecutor implements Executor {
 
         void increment(double timeFactor) {
             scheduledTime += delay * timeFactor;
-        }
-    }
-
-    private static class StableExecutionItem extends ExecutionItem {
-
-        public StableExecutionItem(Runnable task, long scheduledTime, long delay, boolean repeat) {
-            super(task, scheduledTime, delay, repeat);
-        }
-
-        @Override
-        long targetTime(double timeFactor) {
-            return scheduledTime + delay;
-        }
-
-        @Override
-        void increment(double timeFactor) {
-            scheduledTime += delay;
         }
     }
 

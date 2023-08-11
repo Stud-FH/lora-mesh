@@ -1,18 +1,18 @@
 package v2.shared.testing;
 
-import v2.core.context.Module;
-import v2.core.domain.DataSinkClient;
 import v2.core.context.Context;
+import v2.core.context.Module;
+import v2.core.domain.DataSinkModule;
 import v2.core.domain.message.Message;
 
 import java.util.Collection;
 
-public class GuardedDataSinkClient implements DataSinkClient {
+public class GuardedDataSinkModule implements DataSinkModule {
 
-    private final DataSinkClient data;
+    private final DataSinkModule data;
     private Handle handle;
 
-    public GuardedDataSinkClient(DataSinkClient data) {
+    public GuardedDataSinkModule(DataSinkModule data) {
         this.data = data;
     }
 

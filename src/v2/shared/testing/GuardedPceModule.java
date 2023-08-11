@@ -1,21 +1,20 @@
 package v2.shared.testing;
 
+import v2.core.context.Context;
 import v2.core.context.Module;
 import v2.core.domain.ChannelInfo;
 import v2.core.domain.CorrespondenceRegister;
-import v2.core.domain.node.NodeInfo;
-import v2.core.domain.PceClient;
-import v2.core.context.Context;
+import v2.core.domain.PceModule;
 import v2.core.domain.message.Message;
 
 import java.util.List;
 
-public class GuardedPceClient implements PceClient {
+public class GuardedPceModule implements PceModule {
 
-    private final  PceClient pce;
+    private final PceModule pce;
     private Handle handle;
 
-    public GuardedPceClient(PceClient pce) {
+    public GuardedPceModule(PceModule pce) {
         this.pce = pce;
     }
 
@@ -36,8 +35,8 @@ public class GuardedPceClient implements PceClient {
     }
 
     @Override
-    public ChannelInfo heartbeat(NodeInfo nodeInfo) {
-        return handle.pceDisabled()? null : pce.heartbeat(nodeInfo);
+    public ChannelInfo heartbeat() {
+        return handle.pceDisabled()? null : pce.heartbeat();
     }
 
     @Override

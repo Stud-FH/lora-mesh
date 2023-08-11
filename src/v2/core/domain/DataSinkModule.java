@@ -5,7 +5,7 @@ import v2.core.domain.message.Message;
 
 import java.util.Collection;
 
-public interface DataSinkClient extends Module {
+public interface DataSinkModule extends Module {
 
     boolean heartbeat();
     Collection<Integer> feed(Message message);

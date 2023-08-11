@@ -1,8 +1,8 @@
 package v2.shared.impl;
 
-import v2.core.log.Logger;
 import v2.core.context.Context;
 import v2.core.context.Module;
+import v2.core.log.Logger;
 import v2.shared.integration.FileClient;
 
 import java.io.ByteArrayOutputStream;

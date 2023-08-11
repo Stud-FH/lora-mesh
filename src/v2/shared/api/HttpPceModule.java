@@ -1,31 +1,34 @@
 package v2.shared.api;
 
+import v2.core.common.Observable;
+import v2.core.context.Context;
 import v2.core.domain.ChannelInfo;
 import v2.core.domain.CorrespondenceRegister;
-import v2.core.domain.node.NodeInfo;
-import v2.core.domain.PceClient;
-import v2.core.context.Context;
+import v2.core.domain.PceModule;
 import v2.core.domain.message.Message;
-import v2.core.log.Logger;
+import v2.core.domain.node.Node;
+import v2.shared.measurements.PceModuleInsights;
 import v2.shared.util.JsonUtil;
 
 import java.util.List;
 
-public class HttpPceClient implements PceClient {
+public class HttpPceModule implements PceModule, PceModuleInsights {
+
+    private Observable<Message> forwarded = new Observable<>();
 
     private Http http;
-    private Logger logger;
+    private Node node;
 
     @Override
     public void build(Context ctx) {
         http = ctx.resolve(Http.class);
-        logger = ctx.resolve(Logger.class);
+        node = ctx.resolve(Node.class);
     }
 
     @Override
-    public ChannelInfo heartbeat(NodeInfo nodeInfo) {
+    public ChannelInfo heartbeat() {
         try {
-            String response = http.postResponseString("/pce", JsonUtil.nodeInfo(nodeInfo));
+            String response = http.postResponseString("/pce", JsonUtil.nodeInfo(node));
             return new ChannelInfo(response);
         } catch (Exception e) {
             return null;
@@ -35,7 +38,7 @@ public class HttpPceClient implements PceClient {
     @Override
     public byte allocateAddress(long serialId, byte mediatorId, double mediatorRetx) {
         String response = http.postResponseString(
-                String.format("/pce/node-id?mediatorId=%d&mediatorRetx=%,.4f", mediatorId, mediatorRetx), serialId + "");
+                String.format("/pce/address?mediatorId=%d&mediatorRetx=%,.4f", mediatorId, mediatorRetx), serialId + "");
         return Byte.parseByte(response);
     }
 
@@ -46,7 +49,13 @@ public class HttpPceClient implements PceClient {
 
     @Override
     public List<String> feed(long controllerId, Message message) {
-        var response = http.postResponseString("/pce/feed", JsonUtil.message(message));
+        forwarded.next(message);
+        var response = http.postResponseString(String.format("/pce/feed?controllerId=%d", controllerId), JsonUtil.message(message));
         return JsonUtil.parseStringList(response);
+    }
+
+    @Override
+    public Observable<Message> forwarded() {
+        return forwarded;
     }
 }

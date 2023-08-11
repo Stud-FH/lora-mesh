@@ -1,11 +1,9 @@
 package v2.shared.api;
 
-import v2.core.context.Module;
 import v2.core.domain.CorrespondenceRegister;
 import v2.core.domain.message.Message;
 import v2.core.domain.message.MessageHeader;
 import v2.core.domain.message.MessageType;
-import v2.core.log.Logger;
 import v2.shared.util.JsonUtil;
 
 import java.util.Collection;

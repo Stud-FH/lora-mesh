@@ -1,29 +1,34 @@
 package v2.simulation.impl;
 
+import v2.core.common.Observable;
 import v2.core.concurrency.Executor;
-import v2.core.log.Logger;
-import v2.core.domain.ChannelInfo;
-import v2.core.domain.LoRaMeshClient;
-import v2.core.domain.Observer;
 import v2.core.context.Context;
+import v2.core.domain.ChannelInfo;
+import v2.core.domain.LoRaMeshModule;
+import v2.core.common.Observer;
 import v2.core.domain.message.Message;
 import v2.core.domain.message.MessageType;
+import v2.core.log.Logger;
+import v2.shared.measurements.LoraMeshModuleInsights;
 import v2.simulation.Simulation;
 import v2.simulation.util.NodeHandle;
 
 import java.io.Serializable;
-import java.util.*;
-import java.util.function.Consumer;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.Random;
 
-public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
+public class SimulatedLoRaMeshModule implements LoRaMeshModule, LoraMeshModuleInsights, Serializable {
 
     private Simulation simulation;
     private Executor exec;
     private NodeHandle handle;
     private Logger logger;
-    private Consumer<Message> receiveCallback;
+    private final Observable<Message> triggered = new Observable<>();
+    private final Observable<Message> received = new Observable<>();
     private final Queue<Item> queue = new LinkedList<>();
     private ChannelInfo listeningChannel;
+    private Observer.Ref listeningObserverRef;
     private long lastSent;
     private long lastHello;
 
@@ -40,12 +45,16 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
         exec.schedulePeriodic(this::trigger, 1000, 500);
     }
 
+    @Override
+    public Observable<Message> triggered() {
+        return triggered;
+    }
+
     private void trigger() {
         if (queue.isEmpty()) {
+            triggered.next(null);
             return;
         }
-        var id = handle.id();
-
         var item = queue.poll();
         var message = item.message;
         var channel = item.channel;
@@ -56,22 +65,15 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
             lastSent = System.currentTimeMillis();
         }
 
+        triggered.next(message);
+
         Random r = new Random();
-//        simulation.all().stream()
-//                .filter(NodeHandle::isAlive)
-//                .filter(n -> channel.equals(n.listeningChannel()))
-//                .filter(n -> n != handle)
-//                .filter(n -> n.reception(handle) >= r.nextDouble())
-//                .forEach(other -> other.receive(message));
-        for (var other : simulation.all()) {
-            var a = other != handle;
-            var b = other.isAlive();
-            var c = channel.equals(other.listeningChannel());
-            var d =  other.reception(handle) >= r.nextDouble();
-            if (a&&b&&c&&d) {
-                other.receive(message);
-            }
-        }
+        simulation.all().stream()
+                .filter(NodeHandle::isAlive)
+                .filter(n -> channel.equals(n.listeningChannel()))
+                .filter(n -> n != handle)
+                .filter(n -> n.reception(handle) >= r.nextDouble())
+                .forEach(other -> other.receive(message));
     }
 
     @Override
@@ -80,13 +82,16 @@ public class SimulatedLoRaMeshClient implements LoRaMeshClient, Serializable {
     }
 
     public void receive(Message message) {
-        receiveCallback.accept(message);
+        received.next(message);
     }
 
     @Override
     public void listen(ChannelInfo channelInfo, Observer<Message> observer) {
+        if (this.listeningObserverRef != null) {
+            listeningObserverRef.unsubscribe();
+        }
         this.listeningChannel = channelInfo;
-        this.receiveCallback = observer::next;
+        listeningObserverRef = received.subscribe(observer);
     }
 
     public ChannelInfo listeningChannel() {

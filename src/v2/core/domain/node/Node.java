@@ -1,21 +1,20 @@
 package v2.core.domain.node;
 
+import v2.core.common.Subject;
 import v2.core.concurrency.Executor;
-import v2.core.domain.Observer;
-import v2.shared.impl.LocalCorrespondenceRegister;
-import v2.shared.impl.RetxRegisterImpl;
-import v2.core.log.Logger;
-import v2.core.domain.*;
 import v2.core.context.Context;
 import v2.core.context.Module;
+import v2.core.domain.*;
 import v2.core.domain.message.Message;
 import v2.core.domain.message.MessageHeader;
 import v2.core.domain.message.MessageType;
+import v2.core.log.Logger;
 import v2.core.util.MessageUtil;
+import v2.shared.impl.LocalCorrespondenceRegister;
+import v2.shared.impl.RetxRegisterImpl;
 
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.function.Consumer;
 
 public class Node implements Module {
 
@@ -32,14 +31,13 @@ public class Node implements Module {
     public static final int JOIN_VOLLEY = 10;
     public static final long JOIN_DELAY = 10;
 
-    private byte address = -1;
-    private NodeStatus status = NodeStatus.Down;
+    private int address = -1;
+    private final Subject<NodeStatus> status = new Subject<>(NodeStatus.Down);
     private ChannelInfo meshChannel;
-    private final Set<Byte> routingRegistry = new HashSet<>();
+    private final Set<Integer> routingRegistry = new HashSet<>();
 
     private RetxRegister retxRegister;
-    private final Map<Integer, Double> retxMap = new HashMap<>();
-    private final Map<String, Integer> joinCounter = new HashMap<>();
+    private final Map<Long, Integer> joinCounter = new HashMap<>();
     private final Map<Integer, Integer> traceCounter = new HashMap<>();
 
     private CorrespondenceRegister uplink;
@@ -51,11 +49,10 @@ public class Node implements Module {
     private OsAdapter os;
     private Executor exec;
     private Logger logger;
-    private LoRaMeshClient lora;
-    private PceClient pce;
-    private DataSinkClient dataSink;
+    private LoRaMeshModule lora;
+    private PceModule pce;
+    private DataSinkModule dataSink;
     private Runnable teardownCallback;
-    private Observer<Message> messageObserver;
 
     @Override
     public void build(Context ctx) {
@@ -63,9 +60,9 @@ public class Node implements Module {
         os = ctx.resolve(OsAdapter.class);
         logger = ctx.resolve(Logger.class);
         exec = ctx.resolve(Executor.class);
-        lora = ctx.resolve(LoRaMeshClient.class);
-        pce = ctx.resolve(PceClient.class);
-        dataSink = ctx.resolve(DataSinkClient.class);
+        lora = ctx.resolve(LoRaMeshModule.class);
+        pce = ctx.resolve(PceModule.class);
+        dataSink = ctx.resolve(DataSinkModule.class);
         teardownCallback = ctx::destroy;
     }
 
@@ -83,21 +80,33 @@ public class Node implements Module {
         return config.id();
     }
 
+    public int address() {
+        return address;
+    }
+
+    public Subject<NodeStatus> status() {
+        return status;
+    }
+
+    public Map<Integer, Double> retx() {
+        return retxRegister== null? new HashMap<>() : retxRegister.calculateRetx(0.2);
+    }
+
     public boolean isAlive() {
-        return status != NodeStatus.Down && status != NodeStatus.Error;
+        return status.value() != NodeStatus.Down && status.value() != NodeStatus.Error;
     }
 
     public void statusCheck() {
         debug("status check");
-        switch (status) {
+        switch (status.value()) {
             case Node:
-                var result = pce.heartbeat(snapshot());
+                var result = pce.heartbeat();
                 if (result != null) error("connected");
                 dataSinkConnected = dataSink.heartbeat();
                 break;
 
             case Controller:
-                meshChannel = pce.heartbeat(snapshot());
+                meshChannel = pce.heartbeat();
                 if (meshChannel == null) error("disconnected");
                 dataSinkConnected = dataSink.heartbeat();
                 break;
@@ -117,7 +126,7 @@ public class Node implements Module {
     }
 
     public void error(String format, Object... args) {
-        status = NodeStatus.Error;
+        status.set(NodeStatus.Error);
         logger.error(String.format(format, args), this);
         teardownCallback.run();
         os.reboot();
@@ -132,7 +141,7 @@ public class Node implements Module {
         }
 
         dataSinkConnected = dataSink.heartbeat();
-        meshChannel = pce.heartbeat(snapshot());
+        meshChannel = pce.heartbeat();
         if (meshChannel != null) {
             initNode(pce.allocateAddress(id(), (byte) -1, 0.0), true);
         } else {
@@ -155,7 +164,7 @@ public class Node implements Module {
             info("feeding data sink: %s", message);
             var tracingHeaders = dataSink.feed(message);
             registerTracingHeaders(tracingHeaders);
-        } else if (MessageType.Upwards.matches(message) && status == NodeStatus.Controller) {
+        } else if (MessageType.Upwards.matches(message) && status.value() == NodeStatus.Controller) {
             debug("feeding pce: %s", message);
             var commands = pce.feed(id(), message);
             if (commands.isEmpty()) {
@@ -169,14 +178,6 @@ public class Node implements Module {
         }
     }
 
-    private void listen(ChannelInfo channel, Consumer<Message> callback) {
-        if (messageObserver != null) {
-            messageObserver.dispose();
-        }
-        messageObserver = new MessageObserver(callback, this::isAlive);
-        lora.listen(channel, messageObserver);
-    }
-
     private void sendRendezvous() {
         debug("rendezvous emit");
         lora.enqueue(ChannelInfo.rendezvous,
@@ -186,7 +187,7 @@ public class Node implements Module {
     private void seek() {
         debug("entering seek mode...");
         address = -1;
-        status = NodeStatus.Seeking;
+        status.set(NodeStatus.Seeking);
 
         lora.listen(ChannelInfo.rendezvous, new MessageObserver(m -> {
             meshChannel = MessageUtil.rendezvousDataToChannelInfo(m.data());
@@ -197,12 +198,12 @@ public class Node implements Module {
     private void join() {
         debug("entering join mode...");
         address = 0;
-        status = NodeStatus.Joining;
+        status.set(NodeStatus.Joining);
 
         hello = LocalCorrespondenceRegister.from(address);
         var data = MessageUtil.sidToJoinData(id());
 
-        listen(meshChannel, message -> {
+        lora.listen(meshChannel, message -> {
             if (MessageType.DownwardsJoin.matches(message) && message.hasData()) {
                 var result = MessageUtil.inviteDataToInviteResult(message.data);
                 if (result.serialId == id()) {
@@ -222,15 +223,14 @@ public class Node implements Module {
         hello = LocalCorrespondenceRegister.from(this.address);
         uplink = LocalCorrespondenceRegister.from(this.address);
         retxRegister = new RetxRegisterImpl();
-        status = controller? NodeStatus.Controller : NodeStatus.Node;
+        status.set(controller? NodeStatus.Controller : NodeStatus.Node);
 
         exec.schedulePeriodic(this::statusCheck, STATUS_CHECK_PERIOD, STATUS_CHECK_DELAY);
         exec.schedulePeriodic(() -> emit(generateHello()), HELLO_PERIOD, HELLO_DELAY);
         exec.schedulePeriodic(this::sendRendezvous, RENDEZVOUS_PERIOD, RENDEZVOUS_DELAY);
         exec.schedulePeriodic(() -> emit(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
 
-        Consumer<Message> callback = controller? this::handleMessageAsController : this::handleMessageAsNode;
-        listen(meshChannel, callback);
+        lora.listen(meshChannel, controller? this::handleMessageAsController : this::handleMessageAsNode);
     }
 
     private void  handleMessageAsController(Message message) {
@@ -260,17 +260,18 @@ public class Node implements Module {
         if (message.getAddress() == address) {
             warn("received own hello");
         } else if (message.getAddress() == 0) {
-            var code = message.dataAsString(1);
+            ByteBuffer buf = ByteBuffer.wrap(message.data());
+            buf.get(); // left empty
+            long id = buf.getLong();
 
-
-            joinCounter.compute(code, (k, v) -> {
-
+            joinCounter.compute(id, (k, v) -> {
                 if (v == null) {
                     exec.schedule(() -> {
-                                byte reliability = (byte) (255f * joinCounter.remove(code) / JOIN_VOLLEY);
-                                byte[] data = message.data();
-                                data[0] = reliability;
-                                emit(uplink.packAndIncrement(MessageType.UpwardsJoin, data));
+                                byte reliability = (byte) (255f * joinCounter.remove(id) / JOIN_VOLLEY);
+                                ByteBuffer buf2 = ByteBuffer.allocate(9);
+                                buf2.put(reliability);
+                                buf2.putLong(id);
+                                emit(uplink.packAndIncrement(MessageType.UpwardsJoin, buf2.array()));
                             }, JOIN_DELAY);
                     return 1;
                 } else {
@@ -307,27 +308,27 @@ public class Node implements Module {
 
     private void handleJoin(Message message) {
         debug("received join: %s", message);
+        int address = message.data(0);
         if (MessageType.Downwards.matches(message) && message.getAddress() == address) {
             registerTracingHeaders(MessageUtil.countersToTracingHeaders(uplink.address(), uplink.registerAndListLosses(message)));
-            byte assignedId = message.data(0);
-            routingRegistry.add(assignedId);
-            routingRegistry.add((byte) (assignedId | MessageHeader.DOWNWARDS_BIT));
+            routingRegistry.add(address);
+            routingRegistry.add(address | MessageHeader.DOWNWARDS_BIT);
 
-            exec.async(() -> this.invite(assignedId, message));
+            exec.async(() -> this.invite(address, message));
 
         } else if (MessageType.Downwards.matches(message) && shouldForward(message)) {
-            routingRegistry.add(message.data(0));
-            routingRegistry.add((byte) (message.data(0) | MessageHeader.DOWNWARDS_BIT));
+            routingRegistry.add(address);
+            routingRegistry.add(message.data(0) | MessageHeader.DOWNWARDS_BIT);
             emit(message);
         } else {
             handleDefaultAsNode(message);
         }
     }
 
-    private void invite(byte assignedId, Message message) {
-        if (!retxRegister.knows(assignedId)) {
+    private void invite(int address, Message message) {
+        if (!retxRegister.knows(address)) {
             emit(message);
-            exec.schedule(() -> this.invite(assignedId, message), INVITE_RESPONSE_TIMEOUT);
+            exec.schedule(() -> this.invite(address, message), INVITE_RESPONSE_TIMEOUT);
         }
     }
     private void handleRouting(Message message) {
@@ -364,12 +365,11 @@ public class Node implements Module {
     }
 
     private Message generateNetworkData() {
-        var retx = retxRegister.calculateRetxMap(0.5, RetxRegisterImpl.HISTORY_BREAKPOINT_OPTION);
-        var entries = retx.entrySet();
-        ByteBuffer buffer = ByteBuffer.allocate(entries.size() * 2);
-        entries.forEach(e -> {
-            buffer.put(e.getKey());
-            buffer.put((byte) (e.getValue() * 256));
+        var retx = retx();
+        ByteBuffer buffer = ByteBuffer.allocate(retx.size() * 2);
+        retx.forEach((key, value) -> {
+            buffer.put(key.byteValue());
+            buffer.put((byte) (value * 256));
         });
         byte[] data = buffer.array();
         return uplink.packAndIncrement(MessageType.UpwardsRouting, data);
@@ -387,20 +387,8 @@ public class Node implements Module {
         }
     }
 
-    public byte getAddress() {
-        return address;
-    }
-
-    public NodeStatus getStatus() {
-        return status;
-    }
-
-    public Set<Byte> getRoutingRegistry() {
+    public Set<Integer> getRoutingRegistry() {
         return routingRegistry;
-    }
-
-    public NodeInfo snapshot() {
-        return new NodeInfo(id(), status, address, retxMap);
     }
 
     @Override
@@ -409,9 +397,9 @@ public class Node implements Module {
     }
 
     private void updateRouting(byte[] data) {
-        for (byte address : data) {
+        for (int address : data) {
             if ((address & MessageHeader.DELETE_BIT) != 0) {
-                routingRegistry.remove(address);
+                routingRegistry.remove(address & ~MessageHeader.DELETE_BIT);
             } else {
                 routingRegistry.add(address);
             }
