@@ -344,7 +344,7 @@ public class Node implements Module {
         }
     }
 
-    private Message generateHello() {
+    private synchronized Message generateHello() {
         byte[] data = new byte[traceCounter.size() * 2];
         int i = 0;
         Map<Integer, Integer> copy = new HashMap<>(traceCounter);
@@ -427,15 +427,18 @@ public class Node implements Module {
 
     private void registerTracingHeaders(Collection<Integer> tracingHeaders) {
         for (int tracingHeader : tracingHeaders) {
-            traceCounter.putIfAbsent(tracingHeader, 0);
             if (MessageType.Resolved.matches(tracingHeader)) {
+                traceCounter.putIfAbsent(tracingHeader, 0);
                 traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
-                continue;
-            }
-            Message restored = cache.restore(tracingHeader);
-            if (restored != null) {
-                traceCounter.remove(tracingHeader & ~MessageHeader.RESOLVED_BIT);
-                exec.async(() -> emit(restored));
+            } else {
+                Message restored = cache.restore(tracingHeader);
+                if (restored != null) {
+                    traceCounter.remove(tracingHeader);
+                    traceCounter.putIfAbsent(tracingHeader & ~MessageHeader.RESOLVED_BIT, 0);
+                    exec.async(() -> emit(restored));
+                } else if ((tracingHeader & MessageHeader.ADDRESS_MASK) != nodeId) {
+                    traceCounter.putIfAbsent(tracingHeader, 0);
+                }
             }
         }
     }

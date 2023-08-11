@@ -14,13 +14,14 @@ public class MessageCache {
         headers = new int[capacity];
         data = new byte[capacity][];
         pointer = 0;
+        for (int i = 0; i < capacity; i++) headers[i] = -1;
     }
 
     public void store(Message m) {
         // remove previous
         int idx = findIndex(m.header(), MessageHeader.HEADER_MASK);
         if (idx != -1) {
-            headers[idx] = 0;
+            headers[idx] = -1;
         }
         // store
         headers[pointer] = m.header();

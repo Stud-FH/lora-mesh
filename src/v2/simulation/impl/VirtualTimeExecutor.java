@@ -144,7 +144,7 @@ public class VirtualTimeExecutor implements Executor {
                 var task = dequeue();
 //                logger.debug("t"+workerId+" cycle", this);
                 task.run();
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
                 logger.exception(e, this);
             }
         }

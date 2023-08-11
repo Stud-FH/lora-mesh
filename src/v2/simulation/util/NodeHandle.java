@@ -1,4 +1,4 @@
-package v2.simulation;
+package v2.simulation.util;
 
 import v2.core.log.Logger;
 import v2.core.domain.ChannelInfo;
@@ -7,8 +7,10 @@ import v2.core.context.Module;
 import v2.core.domain.message.Message;
 import v2.core.domain.node.Node;
 import v2.core.domain.node.NodeStatus;
-import v2.simulation.util.NodeLabel;
+import v2.simulation.domain.NodeSimulationSpecs;
+import v2.simulation.impl.SimulatedLoRaMeshClient;
 
+import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.Set;
 
@@ -17,14 +19,21 @@ public class NodeHandle implements Module {
     private Node node;
     private NodeSimulationSpecs specs;
     private SimulatedLoRaMeshClient lora;
-    private NodeLabel label;
+    private String label;
 
     @Override
     public void build(Context ctx) {
         node = ctx.resolve(Node.class);
         specs = ctx.resolve(NodeSimulationSpecs.class);
         lora = ctx.resolve(SimulatedLoRaMeshClient.class);
-        label = ctx.resolve(NodeLabel.class);
+
+        ByteBuffer buf = ByteBuffer.allocate(8);
+        buf.putLong(node.sid());
+        label = new String(buf.array());
+    }
+
+    public String label() {
+        return label;
     }
 
     public NodeSimulationSpecs specs() {
@@ -37,10 +46,6 @@ public class NodeHandle implements Module {
 
     public long sid() {
         return specs.sid();
-    }
-
-    public String label() {
-        return label.get();
     }
 
     public double x() {
@@ -82,15 +87,15 @@ public class NodeHandle implements Module {
     }
 
     public ChannelInfo listeningChannel() {
-        return lora.listeningChannel;
+        return lora.listeningChannel();
     }
 
     public long lastSent() {
-        return lora.lastSent;
+        return lora.lastSent();
     }
 
     public long lastHello() {
-        return lora.lastHello;
+        return lora.lastHello();
     }
 
     public double reception(NodeHandle other) {

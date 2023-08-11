@@ -1,10 +1,9 @@
 package v2.simulation.gui;
 
-import v2.core.concurrency.Executor;
 import v2.core.context.Context;
 import v2.core.context.Module;
 import v2.core.domain.message.MessageHeader;
-import v2.simulation.NodeHandle;
+import v2.simulation.util.NodeHandle;
 import v2.simulation.Simulation;
 import v2.simulation.impl.VirtualTimeExecutor;
 

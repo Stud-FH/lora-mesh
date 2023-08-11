@@ -2,8 +2,8 @@ package v2.production;
 
 import v2.production.impl.E32LoRaMeshClient;
 import v2.production.impl.LinuxAdapter;
-import v2.production.extension.HttpSynchronizer;
-import v2.production.extension.RpiTemperatureSensor;
+import v2.production.maintenance.HttpSynchronizer;
+import v2.production.datasource.RpiTemperatureSensor;
 import v2.production.util.ConfigReader;
 import v2.shared.api.Http;
 import v2.shared.api.HttpDataClient;
@@ -25,7 +25,7 @@ import java.nio.file.Path;
 
 public class Production {
 
-    public static void main(String... args) throws URISyntaxException {
+    public static void main(String... args) {
 
         System.out.println("initializing LoRa Mesh Node v3...");
         var root = Path.of("/home/pi/lora-mesh");

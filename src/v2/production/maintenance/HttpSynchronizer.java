@@ -1,4 +1,4 @@
-package v2.production.extension;
+package v2.production.maintenance;
 
 import v2.shared.api.Http;
 import v2.core.concurrency.Executor;

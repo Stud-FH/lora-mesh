@@ -11,15 +11,17 @@ import v2.core.log.LogMultiplexer;
 import v2.core.log.Logger;
 import v2.core.context.Context;
 import v2.core.domain.node.Node;
-import v2.simulation.extension.SimulatedDataSource;
+import v2.simulation.domain.NodeSimulationSpecs;
+import v2.simulation.datasource.SimulatedDataSource;
 import v2.simulation.gui.ControlPanel;
 import v2.simulation.gui.GUI;
 import v2.simulation.gui.GraphPanel;
 import v2.shared.testing.GuardedDataSinkClient;
 import v2.shared.testing.GuardedPceClient;
 import v2.simulation.impl.PseudoOs;
+import v2.simulation.impl.SimulatedLoRaMeshClient;
 import v2.simulation.impl.VirtualTimeExecutor;
-import v2.simulation.util.NodeLabel;
+import v2.simulation.util.NodeHandle;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -64,7 +66,6 @@ public class Simulation implements ConsoleLogger.Handle, FileClient.Config, Virt
         context.put(specs, new Context.Builder(sharedContext)
                 .register(specs)
                 .register(nodeHandle)
-                .register(new NodeLabel())
                 .register(new Node())
                 .register(new PseudoOs(this))
                 .register(new LogMultiplexer(new ConsoleLogger(), new FileLogger(), new HttpLogger()))

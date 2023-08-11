@@ -2,7 +2,7 @@ package v2.simulation.impl;
 
 import v2.core.domain.OsAdapter;
 import v2.core.context.Context;
-import v2.simulation.NodeHandle;
+import v2.simulation.util.NodeHandle;
 import v2.simulation.Simulation;
 
 import java.nio.file.Path;

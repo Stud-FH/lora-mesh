@@ -1,4 +1,4 @@
-package v2.simulation;
+package v2.simulation.domain;
 
 import v2.core.log.Logger;
 import v2.core.domain.node.Node;
