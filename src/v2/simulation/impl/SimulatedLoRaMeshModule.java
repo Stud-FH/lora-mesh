@@ -1,5 +1,6 @@
 package v2.simulation.impl;
 
+import v2.core.common.BasicObservable;
 import v2.core.common.Observable;
 import v2.core.concurrency.Executor;
 import v2.core.context.Context;
@@ -24,8 +25,8 @@ public class SimulatedLoRaMeshModule implements LoRaMeshModule, LoraMeshModuleIn
     private Executor exec;
     private NodeHandle handle;
     private Logger logger;
-    private final Observable<Message> triggered = new Observable<>();
-    private final Observable<Message> received = new Observable<>();
+    private final BasicObservable<Message> triggered = new BasicObservable<>();
+    private final BasicObservable<Message> received = new BasicObservable<>();
     private final Queue<Item> queue = new LinkedList<>();
     private ChannelInfo listeningChannel;
     private Observer.Ref listeningObserverRef;

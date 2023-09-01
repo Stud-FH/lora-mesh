@@ -1,23 +1,12 @@
 package v2.core.common;
 
-public class Subject<T> extends Observable<T> {
-    private T value;
+import java.util.function.Supplier;
 
-    public Subject(T value) {
-        this.value = value;
-    }
-
-    public T value() {
-        return value;
-    }
-
-    public void set(T value) {
-        next(value);
-    }
+public interface Subject<T> extends Observable<T>, Supplier<T> {
+    T value();
 
     @Override
-    public void next(T value) {
-        this.value = value;
-        super.next(value);
+    default T get() {
+        return value();
     }
 }

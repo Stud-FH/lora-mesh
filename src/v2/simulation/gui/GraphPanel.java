@@ -12,6 +12,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
+import java.util.ArrayList;
 import java.util.Comparator;
 
 public class GraphPanel extends JPanel implements Module {
@@ -154,7 +155,8 @@ public class GraphPanel extends JPanel implements Module {
             g2.drawLine(0, y(i), getWidth(), y(i));
         }
 
-        for (var node : simulation.all()) {
+        var nodes = new ArrayList<>(simulation.all());
+        for (var node : nodes) {
             g2.setColor(new Color(200, 200, 200));
             if (simulation.view.equals("upwards")) {
                 for (var other : simulation.all()) {
@@ -171,18 +173,23 @@ public class GraphPanel extends JPanel implements Module {
 
             int mr = (int) Math.sqrt((now - node.lastSent()) * 4);
             int nr = node == simulation.getSelected()? 14 : 10;
-            // message pulse
+//            //message pulse
+            if (simulation.view.equals("pulse")) {
             g2.setColor(new Color(255, 255, 255, Math.max(50-mr, 0)));
             g2.fillOval(x(node) - mr, y(node) - mr, 2*mr+1, 2*mr+1);
             // hello pulse
             g2.setColor(new Color(255, 255, 255, (int) Math.max(node.lastHello() + 100L - now, 0)));
             g2.fillOval(x(node) - nr, y(node) - nr, 2*nr+1, 2*nr+1);
+            }
             // node status
             g2.setColor(getColor(node));
             g2.fillOval(x(node) - nr, y(node) - nr, 2*nr+1, 2*nr+1);
             // node position
             g2.setColor(Color.BLACK);
             g2.fillOval(x(node) - 5, y(node) - 5, 11, 11);
+            // node label
+            g2.setColor(Color.WHITE);
+            g2.drawString(node.label(), x(node), y(node) + 25);
         }
 
         g2.dispose();

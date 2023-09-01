@@ -1,25 +1,26 @@
 package v2.simulation;
 
+import v2.core.concurrency.Executor;
 import v2.core.context.Context;
 import v2.core.domain.node.Node;
 import v2.core.log.LogMultiplexer;
 import v2.core.log.Logger;
-import v2.shared.api.Http;
-import v2.shared.api.HttpDataSinkModuleModule;
-import v2.shared.api.HttpLogger;
-import v2.shared.api.HttpPceModule;
 import v2.shared.impl.ConsoleLogger;
 import v2.shared.impl.FileLogger;
 import v2.shared.integration.FileClient;
+import v2.shared.measurements.ExecutorInsights;
+import v2.shared.measurements.NodeStatistics;
+import v2.shared.measurements.ResultsCollector;
 import v2.shared.testing.GuardedDataSinkModule;
 import v2.shared.testing.GuardedPceModule;
-import v2.simulation.datasource.SimulatedDataSource;
+import v2.simulation.data.DataSimulator;
 import v2.simulation.domain.NodeSimulationSpecs;
 import v2.simulation.gui.ControlPanel;
 import v2.simulation.gui.GUI;
 import v2.simulation.gui.GraphPanel;
 import v2.simulation.impl.PseudoOs;
 import v2.simulation.impl.SimulatedLoRaMeshModule;
+import v2.simulation.impl.SimulatedPCE;
 import v2.simulation.impl.VirtualTimeExecutor;
 import v2.simulation.util.NodeHandle;
 
@@ -32,7 +33,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 
-public class Simulation implements ConsoleLogger.Handle, FileClient.Config, VirtualTimeExecutor.Config, Http.Config, SimulatedDataSource.Config, Serializable {
+public class Simulation implements ConsoleLogger.Handle, FileClient.Config, VirtualTimeExecutor.Config, DataSimulator.Config, Serializable {
+    protected static final long SerialVersionUID = 32;
 
     public static final Path root = Path.of(String.format("%s/LoraMesh/simulation", System.getenv("LOCALAPPDATA")));
     public static final URI api = URI.create("http://localhost:8080");
@@ -51,6 +53,15 @@ public class Simulation implements ConsoleLogger.Handle, FileClient.Config, Virt
     @Override
     public void build(Context ctx) {
         sharedContext = ctx;
+        var logger = ctx.resolve(Logger.class);
+        var exec = ctx.resolve(Executor.class);
+
+//        ctx.resolve(ExecutorInsights.class).step().subscribe(step -> {
+//            if (step >= 10000000) {
+//                logger.error("simulation timeout", this);
+//                ctx.destroy("simulation ended");
+//            }
+//        });
     }
 
     public void deploy() {
@@ -61,18 +72,24 @@ public class Simulation implements ConsoleLogger.Handle, FileClient.Config, Virt
         specsList.forEach(this::init);
     }
 
+    @Override
+    public void preDestroy() {
+        System.out.println("finalizing...");
+    }
+
     private void init(NodeSimulationSpecs specs) {
         var nodeHandle = new NodeHandle();
-        context.put(specs, new Context.Builder(sharedContext)
+        var nodeCtx = context.put(specs, new Context.Builder(sharedContext)
                 .register(specs)
                 .register(nodeHandle)
                 .register(new Node())
                 .register(new PseudoOs(this))
-                .register(new LogMultiplexer(new ConsoleLogger(), new FileLogger(), new HttpLogger()))
-                .register(new GuardedDataSinkModule(new HttpDataSinkModuleModule()))
-                .register(new GuardedPceModule(new HttpPceModule()))
+                .register(new LogMultiplexer(new ConsoleLogger(), new FileLogger()))
+                .register(new GuardedDataSinkModule(new DataSimulator()))
+                .register(new GuardedPceModule(new SimulatedPCE()))
                 .register(new SimulatedLoRaMeshModule())
-                .register(new SimulatedDataSource())
+//                .register(new DataSimulator())
+                .register(new NodeStatistics())
                 .build().deploy());
         handle.add(nodeHandle);
     }
@@ -85,14 +102,14 @@ public class Simulation implements ConsoleLogger.Handle, FileClient.Config, Virt
 
     public void remove(NodeHandle node) {
         var specs = node.specs();
-        context.remove(specs).destroy();
+        context.remove(specs).destroy("node removed");
         handle.remove(node);
         specsList.remove(specs);
     }
 
     public void restart(NodeHandle node) {
         var specs = node.specs();
-        context.remove(specs).destroy();
+        context.remove(specs).destroy("node restarted");
         handle.remove(node);
         init(specs);
     }
@@ -138,13 +155,8 @@ public class Simulation implements ConsoleLogger.Handle, FileClient.Config, Virt
     }
 
     @Override
-    public URI api() {
-        return api;
-    }
-
-    @Override
     public int poolSize() {
-        return 5;
+        return 1;
     }
 
     @Override
@@ -178,11 +190,11 @@ public class Simulation implements ConsoleLogger.Handle, FileClient.Config, Virt
                 .register(simulation)
                 .register(new FileClient())
                 .register(new VirtualTimeExecutor())
-                .register(new Http())
                 .register(new ConsoleLogger())
                 .register(new GUI())
                 .register(new GraphPanel())
                 .register(new ControlPanel())
+                .register(new ResultsCollector())
                 .build().deploy();
     }
 }

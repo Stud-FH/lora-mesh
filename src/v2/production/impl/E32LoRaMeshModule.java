@@ -1,6 +1,5 @@
 package v2.production.impl;
 
-import v2.core.common.Subject;
 import v2.core.concurrency.Executor;
 import v2.core.context.Context;
 import v2.core.domain.ChannelInfo;

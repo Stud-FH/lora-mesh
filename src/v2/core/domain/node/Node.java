@@ -1,7 +1,9 @@
 package v2.core.domain.node;
 
+import v2.core.common.BasicSubject;
 import v2.core.common.Subject;
 import v2.core.concurrency.Executor;
+import v2.core.concurrency.CancellationToken;
 import v2.core.context.Context;
 import v2.core.context.Module;
 import v2.core.domain.*;
@@ -15,8 +17,11 @@ import v2.shared.impl.RetxRegisterImpl;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.function.Consumer;
 
 public class Node implements Module {
+
+    public static final boolean DO_TRACE = false;
 
     public static final long STATUS_CHECK_PERIOD = 60000;
     public static final long STATUS_CHECK_DELAY = 32000;
@@ -24,21 +29,24 @@ public class Node implements Module {
     public static final long INVITE_RESPONSE_TIMEOUT = 40100;
     public static final long HELLO_DELAY = 0;
     public static final long RENDEZVOUS_PERIOD = 65000;
-    public static final long RENDEZVOUS_DELAY = 27000;
+    public static final long RENDEZVOUS_DELAY = 0;
     public static final long ROUTING_PERIOD = 120000;
     public static final long ROUTING_DELAY = 107000;
     public static final int TRACING_VOLLEY = 10;
     public static final int JOIN_VOLLEY = 10;
-    public static final long JOIN_DELAY = 10;
+    public static final long JOIN_DELAY = 1000;
+    public static final long JOIN_TIMEOUT = 3000;
 
     private int address = -1;
-    private final Subject<NodeStatus> status = new Subject<>(NodeStatus.Down);
+    private final BasicSubject<NodeStatus> status = new BasicSubject<>(NodeStatus.Down);
     private ChannelInfo meshChannel;
     private final Set<Integer> routingRegistry = new HashSet<>();
 
     private RetxRegister retxRegister;
     private final Map<Long, Integer> joinCounter = new HashMap<>();
     private final Map<Integer, Integer> traceCounter = new HashMap<>();
+
+    private List<CancellationToken> cancellationTokens = new ArrayList<>();
 
     private CorrespondenceRegister uplink;
     private CorrespondenceRegister hello;
@@ -52,7 +60,7 @@ public class Node implements Module {
     private LoRaMeshModule lora;
     private PceModule pce;
     private DataSinkModule dataSink;
-    private Runnable teardownCallback;
+    private Consumer<String> teardownCallback;
 
     @Override
     public void build(Context ctx) {
@@ -68,12 +76,20 @@ public class Node implements Module {
 
     @Override
     public void deploy() {
-        exec.schedule(this::wakeUp, 50);
+        var ct = exec.schedule(this::wakeUp, 50);
+        cancellationTokens.add(ct);
     }
 
     @Override
     public void destroy() {
         info("shutting down");
+        cancelAllProcedures();
+    }
+
+    private synchronized void cancelAllProcedures() {
+        var cancelling = cancellationTokens;
+        cancellationTokens = new ArrayList<>();
+        cancelling.forEach(CancellationToken::cancel);
     }
 
     public long id() {
@@ -93,12 +109,12 @@ public class Node implements Module {
     }
 
     public boolean isAlive() {
-        return status.value() != NodeStatus.Down && status.value() != NodeStatus.Error;
+        return status.get() != NodeStatus.Down && status.get() != NodeStatus.Error;
     }
 
     public void statusCheck() {
         debug("status check");
-        switch (status.value()) {
+        switch (status.get()) {
             case Node:
                 var result = pce.heartbeat();
                 if (result != null) error("connected");
@@ -125,10 +141,10 @@ public class Node implements Module {
         logger.warn(String.format(format, args), this);
     }
 
-    public void error(String format, Object... args) {
+    public void error(String message) {
         status.set(NodeStatus.Error);
-        logger.error(String.format(format, args), this);
-        teardownCallback.run();
+        logger.error(message, this);
+        teardownCallback.accept(String.format("fatal error on node %d: %s", id(), message));
         os.reboot();
     }
 
@@ -164,7 +180,7 @@ public class Node implements Module {
             info("feeding data sink: %s", message);
             var tracingHeaders = dataSink.feed(message);
             registerTracingHeaders(tracingHeaders);
-        } else if (MessageType.Upwards.matches(message) && status.value() == NodeStatus.Controller) {
+        } else if (MessageType.Upwards.matches(message) && status.get() == NodeStatus.Controller) {
             debug("feeding pce: %s", message);
             var commands = pce.feed(id(), message);
             if (commands.isEmpty()) {
@@ -189,14 +205,19 @@ public class Node implements Module {
         address = -1;
         status.set(NodeStatus.Seeking);
 
-        lora.listen(ChannelInfo.rendezvous, new MessageObserver(m -> {
+        lora.listen(ChannelInfo.rendezvous, m -> {
             meshChannel = MessageUtil.rendezvousDataToChannelInfo(m.data());
             join();
-        }, () -> address != -1));
+        });
     }
 
     private void join() {
         debug("entering join mode...");
+
+        if (meshChannel == null) {
+            error("mesh channel not set");
+        }
+
         address = 0;
         status.set(NodeStatus.Joining);
 
@@ -215,20 +236,28 @@ public class Node implements Module {
         for (int i = 0; i < JOIN_VOLLEY; i++) {
             emit(hello.packAndIncrement(MessageType.Hello, data));
         }
+
+        var ct = exec.schedule(this::join, JOIN_TIMEOUT); // timeout will be cancelled when joined successfully
+        cancellationTokens.add(ct);
     }
 
-    private void initNode(byte assignedId, boolean controller) {
-        info("init as %s %d", controller? "controller" : "node", assignedId);
-        this.address = assignedId;
+    private void initNode(int assignedAddress, boolean controller) {
+        info("init as %s %d", controller? "controller" : "node", assignedAddress);
+        cancelAllProcedures();
+        this.address = assignedAddress;
         hello = LocalCorrespondenceRegister.from(this.address);
         uplink = LocalCorrespondenceRegister.from(this.address);
         retxRegister = new RetxRegisterImpl();
         status.set(controller? NodeStatus.Controller : NodeStatus.Node);
 
-        exec.schedulePeriodic(this::statusCheck, STATUS_CHECK_PERIOD, STATUS_CHECK_DELAY);
-        exec.schedulePeriodic(() -> emit(generateHello()), HELLO_PERIOD, HELLO_DELAY);
-        exec.schedulePeriodic(this::sendRendezvous, RENDEZVOUS_PERIOD, RENDEZVOUS_DELAY);
-        exec.schedulePeriodic(() -> emit(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
+        var ct = exec.schedulePeriodic(this::sendRendezvous, RENDEZVOUS_PERIOD, RENDEZVOUS_DELAY);
+        cancellationTokens.add(ct);
+        ct = exec.schedulePeriodic(this::statusCheck, STATUS_CHECK_PERIOD, STATUS_CHECK_DELAY);
+        cancellationTokens.add(ct);
+        ct = exec.schedulePeriodic(() -> emit(generateHello()), HELLO_PERIOD, HELLO_DELAY);
+        cancellationTokens.add(ct);
+        ct = exec.schedulePeriodic(() -> emit(generateNetworkData()), ROUTING_PERIOD, ROUTING_DELAY);
+        cancellationTokens.add(ct);
 
         lora.listen(meshChannel, controller? this::handleMessageAsController : this::handleMessageAsNode);
     }
@@ -261,18 +290,23 @@ public class Node implements Module {
             warn("received own hello");
         } else if (message.getAddress() == 0) {
             ByteBuffer buf = ByteBuffer.wrap(message.data());
+            if (buf.remaining() < 9) {
+                warn("short join: %s", message);
+                return;
+            }
             buf.get(); // left empty
             long id = buf.getLong();
 
             joinCounter.compute(id, (k, v) -> {
                 if (v == null) {
-                    exec.schedule(() -> {
+                    var ct = exec.schedule(() -> {
                                 byte reliability = (byte) (255f * joinCounter.remove(id) / JOIN_VOLLEY);
                                 ByteBuffer buf2 = ByteBuffer.allocate(9);
                                 buf2.put(reliability);
                                 buf2.putLong(id);
                                 emit(uplink.packAndIncrement(MessageType.UpwardsJoin, buf2.array()));
                             }, JOIN_DELAY);
+                    cancellationTokens.add(ct);
                     return 1;
                 } else {
                     return v + 1;
@@ -286,6 +320,9 @@ public class Node implements Module {
     }
 
     private void handleTrace(Message message) {
+        if (!DO_TRACE) {
+            return;
+        }
         debug("received trace: %s", message);
 
         Collection<Byte> uncached = new ArrayList<>();
@@ -314,7 +351,8 @@ public class Node implements Module {
             routingRegistry.add(address);
             routingRegistry.add(address | MessageHeader.DOWNWARDS_BIT);
 
-            exec.async(() -> this.invite(address, message));
+            var ct = exec.async(() -> this.invite(address, message));
+            cancellationTokens.add(ct);
 
         } else if (MessageType.Downwards.matches(message) && shouldForward(message)) {
             routingRegistry.add(address);
@@ -328,7 +366,8 @@ public class Node implements Module {
     private void invite(int address, Message message) {
         if (!retxRegister.knows(address)) {
             emit(message);
-            exec.schedule(() -> this.invite(address, message), INVITE_RESPONSE_TIMEOUT);
+            var ct = exec.schedule(() -> this.invite(address, message), INVITE_RESPONSE_TIMEOUT);
+            cancellationTokens.add(ct);
         }
     }
     private void handleRouting(Message message) {
@@ -350,6 +389,9 @@ public class Node implements Module {
     }
 
     private synchronized Message generateHello() {
+        if (!DO_TRACE) {
+            return hello.packAndIncrement(MessageType.Hello);
+        }
         byte[] data = new byte[traceCounter.size() * 2];
         int i = 0;
         Map<Integer, Integer> copy = new HashMap<>(traceCounter);
@@ -407,6 +449,9 @@ public class Node implements Module {
     }
 
     private void registerTracingHeaders(Collection<Integer> tracingHeaders) {
+        if (!DO_TRACE) {
+            return;
+        }
         for (int tracingHeader : tracingHeaders) {
             if (MessageType.Resolved.matches(tracingHeader)) {
                 traceCounter.putIfAbsent(tracingHeader, 0);
@@ -416,7 +461,8 @@ public class Node implements Module {
                 if (restored != null) {
                     traceCounter.remove(tracingHeader);
                     traceCounter.putIfAbsent(tracingHeader & ~MessageHeader.RESOLVED_BIT, 0);
-                    exec.async(() -> emit(restored));
+                    var ct = exec.async(() -> emit(restored));
+                    cancellationTokens.add(ct);
                 } else if ((tracingHeader & MessageHeader.ADDRESS_MASK) != address) {
                     traceCounter.putIfAbsent(tracingHeader, 0);
                 }
@@ -443,23 +489,28 @@ public class Node implements Module {
                         emit(message);
                     }
                 } else {
-                    exec.async(() -> emit(message));
+                    var ct = exec.async(() -> emit(message));
+                    cancellationTokens.add(ct);
                 }
             }
                 break;
             case "trace": {
-                byte[] data = new byte[parts.length - 2];
-                for (int i = 2; i < parts.length; i++) data[i - 2] = Byte.parseByte(parts[i]);
-                exec.async(() -> emit(pce.correspondence(targetId).pack(MessageType.Trace, data)));
+                if (DO_TRACE) {
+                    byte[] data = new byte[parts.length - 2];
+                    for (int i = 2; i < parts.length; i++) data[i - 2] = (byte) Integer.parseInt(parts[i]);
+                    var ct = exec.async(() -> emit(pce.correspondence(targetId).pack(MessageType.Trace, data)));
+                    cancellationTokens.add(ct);
+                }
             }
                 break;
             case "update": {
                 byte[] data = new byte[parts.length - 2];
-                for (int i = 2; i < parts.length; i++) data[i - 2] = Byte.parseByte(parts[i]);
+                for (int i = 2; i < parts.length; i++) data[i - 2] = (byte) Integer.parseInt(parts[i]);
                 if (targetId == this.address) {
                     updateRouting(data);
                 } else {
-                    exec.async(() -> emit(pce.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)));
+                    var ct = exec.async(() -> emit(pce.correspondence(targetId).packAndIncrement(MessageType.DownwardsRouting, data)));
+                    cancellationTokens.add(ct);
                 }
             }
                 break;

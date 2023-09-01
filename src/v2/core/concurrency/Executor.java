@@ -4,8 +4,10 @@ import v2.core.context.Module;
 
 public interface Executor extends Module {
 
-    void async(Runnable task);
-    void schedule(Runnable task, long delay);
-    void schedulePeriodic(Runnable task, long period, long delay);
+    default CancellationToken async(Runnable task) {
+        return schedule(task, 0);
+    }
+    CancellationToken schedule(Runnable task, long delay);
+    CancellationToken schedulePeriodic(Runnable task, long period, long delay);
 
 }

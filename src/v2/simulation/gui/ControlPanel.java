@@ -14,6 +14,8 @@ import java.awt.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class ControlPanel extends JPanel implements Module {
@@ -21,12 +23,14 @@ public class ControlPanel extends JPanel implements Module {
     private GUI parent;
     private VirtualTimeExecutor exec;
     private Simulation simulation;
+    private Context ctx;
 
     @Override
     public void build(Context ctx) {
         simulation = ctx.resolve(Simulation.class);
         parent = ctx.resolve(GUI.class);
         exec = ctx.resolve(VirtualTimeExecutor.class);
+        this.ctx = ctx;
     }
 
     @Override
@@ -81,6 +85,10 @@ public class ControlPanel extends JPanel implements Module {
         var pauseButton = new JButton(exec.paused()? "run" : "pause");
         pauseButton.addActionListener(a -> {
             exec.pause(!exec.paused());
+            // 1 minute real-time
+            new ScheduledThreadPoolExecutor(1).schedule(() -> ctx.destroy("simulation ended"), 10, TimeUnit.SECONDS);
+            // 10 minutes simulated
+//            exec.schedule(() -> ctx.destroy("simulation ended"), 600000);
             pauseButton.setText(exec.paused()? "run" : "pause");
         });
         panel.add(pauseButton);
@@ -104,6 +112,11 @@ public class ControlPanel extends JPanel implements Module {
         plain.setSelected(true);
         group.add(plain);
         panel.add(plain);
+
+        JRadioButton pulse = new JRadioButton("pulse");
+        pulse.addActionListener(a -> simulation.view = "pulse");
+        group.add(pulse);
+        panel.add(pulse);
 
         JRadioButton upwards = new JRadioButton("upwards");
         upwards.addActionListener(a -> simulation.view = "upwards");

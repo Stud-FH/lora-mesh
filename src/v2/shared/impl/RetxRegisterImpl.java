@@ -15,7 +15,6 @@ public class RetxRegisterImpl implements RetxRegister {
     public static final String HISTORY_BREAKPOINT_OPTION = "history-breakpoint";
     protected static final int COUNTER_LIMIT = 1 << MessageHeader.COUNTER_BITS;
 
-    private boolean expired = false;
     private final Map<Integer, Entry> perAddress = new HashMap<>();
 
     @Override
@@ -24,19 +23,7 @@ public class RetxRegisterImpl implements RetxRegister {
     }
 
     @Override
-    public void dispose() {
-        expired = true;
-        perAddress.clear();
-    }
-
-    @Override
-    public boolean isExpired() {
-        return expired;
-    }
-
-    @Override
     public void next(Message message) {
-        if (expired) throw new IllegalStateException();
         if (!MessageType.Hello.matches(message)) return;
         int counter = message.getCounter();
         var entry = perAddress.computeIfAbsent(message.getNodeAddress(), address -> new Entry(counter));
@@ -47,7 +34,6 @@ public class RetxRegisterImpl implements RetxRegister {
 
     @Override
     public double calculateRetx(int address, String... options) {
-        if (expired) throw new IllegalStateException();
         var entry = perAddress.getOrDefault(address, null);
         if (entry == null) return 0;
 

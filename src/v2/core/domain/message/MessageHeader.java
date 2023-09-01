@@ -29,6 +29,7 @@ public interface MessageHeader {
     int ADDRESS_MASK = (-1 << ADDRESS_SHIFT) ^ (-1 << (ADDRESS_SHIFT + ADDRESS_BITS));
 
     int ADDRESS_MULTIPURPOSE_BIT = 1 << (ADDRESS_BITS - 2);
+    int MESH_ADDRESS_LIMIT = ADDRESS_MULTIPURPOSE_BIT - 1;
     int RESEND_BIT = ADDRESS_MULTIPURPOSE_BIT; // as part of message header, indicates that this message was lost before and should ignore cache
     int DELETE_BIT = ADDRESS_MULTIPURPOSE_BIT; // as part of routing data, indicates that an address should be removed from the forwarding list
     int RESOLVED_BIT = ADDRESS_MULTIPURPOSE_BIT; // as part of tracing data, indicates that a message was found

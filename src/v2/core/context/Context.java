@@ -1,5 +1,8 @@
 package v2.core.context;
 
+import v2.core.common.BasicObservable;
+import v2.core.common.Observable;
+
 import java.util.*;
 
 public class Context {
@@ -15,14 +18,22 @@ public class Context {
     private final Map<Class<? extends Module>, Module> registry;
     private final Collection<Module> modules;
     private Status status = Status.Building;
+    private final BasicObservable<String> teardown = new BasicObservable<>();
 
-    private Context(Map<Class<? extends Module>, Module> registry, Collection<Module> modules) {
+    private Context(Map<Class<? extends Module>, Module> registry, Collection<Module> modules, Observable<String> parentTeardown) {
         this.registry = registry;
         this.modules = modules;
+        if (parentTeardown != null) {
+            parentTeardown.subscribe(this::destroy);
+        }
     }
 
     public Status status() {
         return status;
+    }
+
+    public Observable<String> teardown() {
+        return teardown;
     }
 
     public Context deploy() {
@@ -33,10 +44,11 @@ public class Context {
         return this;
     }
 
-    public synchronized void destroy() {
+    public synchronized void destroy(String terminationMessage) {
         if (status.ordinal() >= Status.Destroying.ordinal()) return;
         modules.forEach(Module::preDestroy);
         status = Status.Destroying;
+        teardown.next(null);
         modules.forEach(Module::destroy);
         status = Status.Destroyed;
     }
@@ -52,12 +64,14 @@ public class Context {
     public static class Builder {
         private final Map<Class<? extends Module>, Module> registry;
         private final Collection<Module> modules = new ArrayList<>();
+        private final Context parentContext;
 
         public Builder() {
             this(null);
         }
 
         public Builder(Context parentContext) {
+            this.parentContext = parentContext;
             registry = parentContext != null? new HashMap<>(parentContext.registry) : new HashMap<>();
         }
 
@@ -77,7 +91,7 @@ public class Context {
         }
 
         public Context build() {
-            Context ctx = new Context(registry, modules);
+            Context ctx = new Context(registry, modules, parentContext == null? null : parentContext.teardown);
             modules.forEach(m -> m.build(ctx));
             return ctx;
         }

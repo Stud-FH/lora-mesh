@@ -40,13 +40,13 @@ public class GuardedPceModule implements PceModule {
     }
 
     @Override
-    public byte allocateAddress(long sid, byte mediatorId, double mediatorRetx) {
+    public int allocateAddress(long sid, byte mediatorId, double mediatorRetx) {
         if (handle.pceDisabled()) throw new IllegalStateException("disabled");
         return pce.allocateAddress(sid, mediatorId, mediatorRetx);
     }
 
     @Override
-    public CorrespondenceRegister correspondence(byte address) {
+    public CorrespondenceRegister correspondence(int address) {
         if (handle.pceDisabled()) throw new IllegalStateException("disabled");
         return pce.correspondence(address);
     }

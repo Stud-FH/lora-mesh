@@ -1,6 +1,7 @@
 package v2.shared.impl;
 
 import v2.core.concurrency.Executor;
+import v2.core.concurrency.CancellationToken;
 import v2.core.context.Context;
 
 import java.util.concurrent.ScheduledExecutorService;
@@ -10,17 +11,14 @@ import java.util.concurrent.TimeUnit;
 public class SimpleExecutor implements Executor {
     private final ScheduledExecutorService executor = new ScheduledThreadPoolExecutor(3);
 
-
-    public synchronized void async(Runnable task) {
-        schedule(task, 0);
+    public synchronized CancellationToken schedule(Runnable task, long delay) {
+        var ref = executor.schedule(task, delay, TimeUnit.MILLISECONDS);
+        return () -> ref.cancel(true);
     }
 
-    public synchronized void schedule(Runnable task, long delay) {
-        executor.schedule(task, delay, TimeUnit.MILLISECONDS);
-    }
-
-    public synchronized void schedulePeriodic(Runnable task, long period, long delay) {
-        executor.scheduleAtFixedRate(task, delay, period, TimeUnit.MILLISECONDS);
+    public synchronized CancellationToken schedulePeriodic(Runnable task, long period, long delay) {
+        var ref = executor.scheduleAtFixedRate(task, delay, period, TimeUnit.MILLISECONDS);
+        return () -> ref.cancel(true);
     }
 
     @Override

@@ -50,6 +50,6 @@ public class Production {
                 .build()
                 .deploy();
 
-        Runtime.getRuntime().addShutdownHook(new Thread(ctx::destroy));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> ctx.destroy("system shut down")));
     }
 }

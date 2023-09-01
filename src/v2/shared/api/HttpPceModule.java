@@ -1,5 +1,6 @@
 package v2.shared.api;
 
+import v2.core.common.BasicObservable;
 import v2.core.common.Observable;
 import v2.core.context.Context;
 import v2.core.domain.ChannelInfo;
@@ -14,7 +15,7 @@ import java.util.List;
 
 public class HttpPceModule implements PceModule, PceModuleInsights {
 
-    private Observable<Message> forwarded = new Observable<>();
+    private final BasicObservable<Message> forwarded = new BasicObservable<>();
 
     private Http http;
     private Node node;
@@ -36,14 +37,14 @@ public class HttpPceModule implements PceModule, PceModuleInsights {
     }
 
     @Override
-    public byte allocateAddress(long serialId, byte mediatorId, double mediatorRetx) {
+    public int allocateAddress(long serialId, byte mediatorId, double mediatorRetx) {
         String response = http.postResponseString(
                 String.format("/pce/address?mediatorId=%d&mediatorRetx=%,.4f", mediatorId, mediatorRetx), serialId + "");
-        return Byte.parseByte(response);
+        return Integer.parseInt(response);
     }
 
     @Override
-    public CorrespondenceRegister correspondence(byte address) {
+    public CorrespondenceRegister correspondence(int address) {
         return new HttpCorrespondenceRegister(address, http);
     }
 

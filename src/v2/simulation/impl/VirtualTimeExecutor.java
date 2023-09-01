@@ -1,6 +1,9 @@
 package v2.simulation.impl;
 
+import v2.core.common.Counter;
+import v2.core.common.Subject;
 import v2.core.concurrency.Executor;
+import v2.core.concurrency.CancellationToken;
 import v2.core.context.Context;
 import v2.core.context.Module;
 import v2.core.log.Logger;
@@ -16,15 +19,15 @@ public class VirtualTimeExecutor implements Executor, ExecutorInsights {
     private Config config;
     private Thread scheduler;
     private Thread[] workerArray;
-    private long taskCounter = 0;
+    private final Counter step = new Counter();
     private boolean running = true;
     private boolean paused = true;
     private final Collection<ExecutionItem> items = new ArrayList<>();
     private final Queue<Runnable> pending = new LinkedList<>();
     private Logger logger;
 
-    public synchronized long taskCounter() {
-        return taskCounter;
+    public Subject<Long> step() {
+        return step;
     }
 
     public boolean paused() {
@@ -36,18 +39,18 @@ public class VirtualTimeExecutor implements Executor, ExecutorInsights {
         notifyAll();
     }
 
-    public synchronized void async(Runnable task) {
-        schedule(task, 0);
+    public synchronized CancellationToken schedule(Runnable task, long delay) {
+        var item = new ExecutionItem(task, System.currentTimeMillis(), delay, false);
+        items.add(item);
+        notifyAll();
+        return () -> item.expired = true;
     }
 
-    public synchronized void schedule(Runnable task, long delay) {
-        items.add(new ExecutionItem(task, System.currentTimeMillis(), delay, false));
+    public synchronized CancellationToken schedulePeriodic(Runnable task, long period, long delay) {
+        var item = new ExecutionItem(task, System.currentTimeMillis() - period + delay, period, true);
+        items.add(item);
         notifyAll();
-    }
-
-    public synchronized void schedulePeriodic(Runnable task, long period, long delay) {
-        items.add(new ExecutionItem(task, System.currentTimeMillis() - period + delay, period, true));
-        notifyAll();
+        return () -> item.expired = true;
     }
 
     @Override
@@ -89,7 +92,7 @@ public class VirtualTimeExecutor implements Executor, ExecutorInsights {
         while (pending.isEmpty()) {
             wait(10);
         }
-        taskCounter++;
+        step.increment();
         return pending.poll();
     }
 

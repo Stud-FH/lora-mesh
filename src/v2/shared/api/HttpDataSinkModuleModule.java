@@ -1,5 +1,6 @@
 package v2.shared.api;
 
+import v2.core.common.BasicObservable;
 import v2.core.common.Observable;
 import v2.core.context.Context;
 import v2.core.domain.DataSinkModule;
@@ -11,7 +12,7 @@ import java.util.Collection;
 
 public class HttpDataSinkModuleModule implements DataSinkModule, DataSinkModuleInsights {
 
-    private Observable<Message> forwarded = new Observable<>();
+    private final BasicObservable<Message> forwarded = new BasicObservable<>();
 
     private Http http;
 

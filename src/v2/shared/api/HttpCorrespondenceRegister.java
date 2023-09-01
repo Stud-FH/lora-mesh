@@ -13,7 +13,7 @@ public class HttpCorrespondenceRegister implements CorrespondenceRegister {
     private final int address;
     private final Http http;
 
-    public HttpCorrespondenceRegister(byte address, Http http) {
+    public HttpCorrespondenceRegister(int address, Http http) {
         this.address = address;
         this.http = http;
     }

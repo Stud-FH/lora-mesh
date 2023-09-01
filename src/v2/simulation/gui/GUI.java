@@ -17,7 +17,7 @@ public class GUI extends JFrame implements Module {
     private final ScheduledExecutorService repaint = new ScheduledThreadPoolExecutor(1);
 
     public GUI() {
-        super("Lora Mesh OpenFlow Simulator");
+        super("LoRa Mesh Simulator");
     }
 
     @Override

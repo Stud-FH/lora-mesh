@@ -10,5 +10,4 @@ public interface RetxRegister extends Observer<Message> {
     double calculateRetx(int address, String... options);
     Map<Integer, Double> calculateRetx(double threshold, String... options);
     boolean knows(int address);
-    void dispose();
 }

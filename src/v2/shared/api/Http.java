@@ -8,6 +8,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 
 public class Http implements Module {
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
@@ -27,6 +28,7 @@ public class Http implements Module {
         try {
             var request = HttpRequest.newBuilder(uri)
                     .GET()
+                    .timeout(Duration.ofMillis(500))
                     .build();
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200) throw new Exception(response.toString());
@@ -42,6 +44,7 @@ public class Http implements Module {
         try {
             var request = HttpRequest.newBuilder(uri)
                     .GET()
+                    .timeout(Duration.ofMillis(500))
                     .build();
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
@@ -57,6 +60,7 @@ public class Http implements Module {
         try {
             var request = HttpRequest.newBuilder(uri)
                     .GET()
+                    .timeout(Duration.ofMillis(500))
                     .build();
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
@@ -72,6 +76,7 @@ public class Http implements Module {
             var request = HttpRequest.newBuilder(uri)
                     .POST(HttpRequest.BodyPublishers.ofString(data))
                     .setHeader("Content-Type", "application/json")
+                    .timeout(Duration.ofMillis(500))
                     .build();
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() != 200) throw new Exception(response.toString());
@@ -87,6 +92,7 @@ public class Http implements Module {
             var request = HttpRequest.newBuilder(uri)
                     .POST(HttpRequest.BodyPublishers.ofString(data))
                     .setHeader("Content-Type", "application/json")
+                    .timeout(Duration.ofMillis(500))
                     .build();
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() != 200) throw new Exception(response.toString());
@@ -101,6 +107,7 @@ public class Http implements Module {
             var request = HttpRequest.newBuilder(uri)
                     .POST(HttpRequest.BodyPublishers.ofByteArray(data))
                     .setHeader("Content-Type", "application/octet-stream")
+                    .timeout(Duration.ofMillis(500))
                     .build();
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() != 200) throw new Exception(response.toString());
@@ -116,6 +123,7 @@ public class Http implements Module {
             var request = HttpRequest.newBuilder(uri)
                     .POST(HttpRequest.BodyPublishers.ofByteArray(data))
                     .setHeader("Content-Type", "application/octet-stream")
+                    .timeout(Duration.ofMillis(500))
                     .build();
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200) throw new Exception(response.toString());
@@ -132,6 +140,7 @@ public class Http implements Module {
             var request = HttpRequest.newBuilder(uri)
                     .POST(HttpRequest.BodyPublishers.ofString(data))
                     .setHeader("Content-Type", "application/json")
+                    .timeout(Duration.ofMillis(500))
                     .build();
             var response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new Exception(response.toString());
